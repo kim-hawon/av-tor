@@ -53,3 +53,49 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ===== 환경 / 설정 비밀값 =====
+.env
+config/secrets.yaml          # MQTT/클라우드 인증정보는 커밋 금지
+*.pem
+*.key
+
+# ===== AI 모델 (용량 큼 — 커밋 금지) =====
+models/vosk-ko/
+models/gaze/
+*.onnx
+*.tflite
+*.pt
+*.pb
+
+# ===== 런타임 산출물 / 로그 =====
+logs/
+*.log
+data/recordings/             # 마이크 녹음, 디버그 캡처
+data/captures/               # 카메라 프레임 캡처
+telemetry/*.jsonl            # 로컬에 쌓인 이벤트 텔레메트리
+
+# ===== 라즈베리파이 / 하드웨어 =====
+*.swp
+.DS_Store
+
+# ===== IDE =====
+.vscode/
+.idea/
+
+# ===== 테스트 / 커버리지 =====
+.pytest_cache/
+.coverage
+htmlcov/
