@@ -6,11 +6,11 @@ monitoring/voice.py가 인식한 STT 결과(raw)를 받아,
 """
 
 
-def verify(recognized_text, scenario):
+def verify(answer: str, text: str) -> bool:
     """인식 텍스트가 시나리오 정답 토큰과 일치하면 True.
 
     예: scenario.answer == "우회전 확인" 이고
         recognized_text 안에 해당 토큰이 포함되면 성공.
     """
-    # TODO: 구현
-    raise NotImplementedError
+    return answer in text
+

@@ -1,0 +1,34 @@
+voice:
+  model_path: "./models/vosk-en"
+  samplerate: 16000
+  blocksize: 4000
+  vocab:
+    - drive
+    - in
+    - lane
+    - one
+    - slow
+    - down
+    - to
+    - sixty
+    - four
+    - forty
+    - "[unk]"
+
+scenarios:
+  - id: 1
+    label: "공사 구간"
+    audio: "./audio/const.wav"
+    answer: "drive in lane one"
+  - id: 2
+    label: "우천 구간"
+    audio: "./audio/rain.wav"
+    answer: "slow down to sixty four"
+  - id: 3
+    label: "안개 구간"
+    audio: "./audio/fog.wav"
+    answer: "slow down to forty"
+  - id: 4
+    label: "결빙 구간"
+    audio: "./audio/ice.wav"
+    answer: "slow down to forty"
