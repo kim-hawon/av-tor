@@ -1,0 +1,7 @@
+# 상태기계 / 설정 (필수)
+PyYAML>=6.0
+
+# 음성인식 (config의 dummy.use_real_voice=true 일 때만 필요)
+vosk>=0.3.45
+sounddevice>=0.4.6
+soundfile>=0.12.1

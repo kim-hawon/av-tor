@@ -32,3 +32,33 @@ scenarios:
     label: "결빙 구간"
     audio: "./audio/ice.wav"
     answer: "slow down to forty"
+
+# 차량 기본 설정
+vehicle:
+  basic_speed: 80 # km/h, 기본 속도 (80키로로 가정)
+
+# 시나리오 설정
+scenario:
+  construction_distance: 400 # m, 공사 구간 TOR 시작 거리
+  distance_update_step: 50 # m, LCD 갱신 단위
+
+# 감속 목표 (km/h), 자동차 전용 도로(80km/h) 가정
+speed_target:
+  rain: 64 # 우천 (20% 감속)
+  fog: 40 # 안개 (50% 감속)
+  ice: 40 # 결빙 (50% 감속)
+
+# 제어권 전환 시간 예산 (초)
+timing:
+  tor_budget: 10 # 기본 TOR 시간
+  voice_extra: 3 # 음성 실패 시 유예 시간
+  warning_urgent: 5 # 부저 가속 시작 (잔여)
+  warning_critical: 3 # 부저 최대 (잔여)
+  end_screen_duration: 3 # 종료 화면 유지 시간
+
+# 더미 설정 (센서 연결 전 시뮬레이션)
+dummy:
+  gaze_ok_after: 3 # n초 후 자동으로 시선 OK
+  grip_ok_after: 4 # n초 후 자동으로 핸들 OK
+  voice_ok: true # 음성 인식 자동 성공 여부 (더미 모드일 때 사용)
+  use_real_voice: false # true면 팀원의 실제 Vosk STT 호출 (마이크/모델/wav 필요)

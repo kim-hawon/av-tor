@@ -1,22 +1,14 @@
-"""HANDOVER_OK 상태: 핸드오버 성공, 수동 운전으로 전환 완료."""
+"""HANDOVER_OK: 제어권 전환 성공."""
+import time
+from core.states import STATE_END
 
 
-def enter(ctx):
-    """핸드오버 성공 HMI 표시, 텔레메트리 기록."""
-    # TODO: 구현
-    pass
+def run(context):
+    duration = context["config"]["timing"]["end_screen_duration"]
 
-
-def handle(ctx):
-    """매 틱 처리. 다음 State를 반환하거나 변화 없으면 None.
-
-    예: 안정화 후 -> State.IDLE
-    """
-    # TODO: 구현
-    return None
-
-
-def exit(ctx):
-    """상태 이탈 시 1회 실행."""
-    # TODO: 구현
-    pass
+    print("[HANDOVER_OK] HMI 가정: Red LED OFF, Green LED ON, "
+          "스피커 '또로롱', LCD 'MANUAL MODE ACTIVE'")
+    print(f"[HANDOVER_OK] 제어권 전환 성공! ({duration}초 표시)")
+    time.sleep(duration)
+    print("[HANDOVER_OK] 시나리오 종료")
+    return STATE_END

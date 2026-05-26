@@ -1,22 +1,12 @@
-"""IDLE 상태: 자율주행 정상 주행, TOR 트리거 대기."""
+"""IDLE 상태: TOR 트리거 대기.
+
+선택된 시나리오를 수신하면 곧바로 PHASE1로 전이한다.
+"""
+from core.states import STATE_PHASE1
 
 
-def enter(ctx):
-    """상태 진입 시 1회 실행 (예: HMI 평상시 표시)."""
-    # TODO: 구현
-    pass
-
-
-def handle(ctx):
-    """매 틱 처리. 다음 State를 반환하거나 변화 없으면 None.
-
-    예: TOR 트리거 감지 시 -> State.PHASE1
-    """
-    # TODO: 구현
-    return None
-
-
-def exit(ctx):
-    """상태 이탈 시 1회 실행."""
-    # TODO: 구현
-    pass
+def run(context):
+    scenario = context["scenario"]
+    print(f"[IDLE] 시나리오 수신: {scenario['label']} (id={scenario['id']})")
+    print("[IDLE] → PHASE1 전이")
+    return STATE_PHASE1
