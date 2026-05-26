@@ -27,19 +27,34 @@
 #     # TODO: 구현
 #     pass
 
-from monitoring.voice import VoiceMonitor
-from hmi.speaker import play
+from vosk import Model, KaldiRecognizer
+import sounddevice as sd
+import soundfile as sf
+import json
 from core.readback import verify
 
 def run(scenario: dict, voice_cfg: dict) -> bool:
-    play(scenario["audio"])
+    audio_data, sr = sf.read(scenario["audio"])
 
-    monitor = VoiceMonitor(voice_cfg["model_path"], voice_cfg["vocab"])
+    rec = KaldiRecognizer(Model(voice_cfg["model_path"]), 16000)
+    rec.SetWords(True)
+    rec.SetGrammar(json.dumps(voice_cfg["vocab"], ensure_ascii=False))
+
     print("Sys: Say something...")
 
-    while True:
-        text = monitor.listen_once(voice_cfg["blocksize"])
-        print(text)
-        if verify(scenario["answer"], text):
-            print("Sys: TOR success")
-            return True
+    with sd.RawInputStream(samplerate=16000, blocksize=voice_cfg["blocksize"],
+                           dtype='int16', channels=1) as stream:
+        sd.play(audio_data, sr)
+        sd.wait()
+        while True:
+            data, _ = stream.read(1000)
+            if rec.AcceptWaveform(bytes(data)):
+                text = json.loads(rec.Result())["text"]
+                print(text)
+                if verify(scenario["answer"], text):
+                    print("Sys: TOR success")
+                    return True
+            else:
+                partial = json.loads(rec.PartialResult())["partial"]
+                if partial:
+                    print(f"  ({partial})", end='\r')
