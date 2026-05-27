@@ -15,23 +15,49 @@ voice:
     - forty
     - "[unk]"
 
+# 시나리오 정의
+#   key          : 입력 키워드 (예: "const 400" 의 const)
+#   param.default: 키워드만 입력했을 때 쓰는 기본 수치 (예: const 만 입력 → 400)
+#   param.unit   : 수치 단위 (참고용)
+#   lcd.phase1   : PHASE1 LCD 1행 경고 템플릿. {v} 자리에 입력 수치가 들어감
+#   lcd.phase2   : PHASE2 LCD 1행 동작 지시 (TTS 안내 내용)
 scenarios:
   - id: 1
+    key: const
     label: "공사 구간"
     audio: "./audio/const.wav"
     answer: "drive in lane one"
+    param: { default: 400, unit: m }
+    lcd:
+      phase1: "WARN:{v}m"
+      phase2: "Lane 1 GO"
   - id: 2
-    label: "우천 구간"
+    key: rain
+    label: "우천"
     audio: "./audio/rain.wav"
     answer: "slow down to sixty four"
+    param: { default: 20, unit: mmh }
+    lcd:
+      phase1: "RAIN {v}mmh"
+      phase2: "Slow 64kmh"
   - id: 3
-    label: "안개 구간"
+    key: fog
+    label: "안개"
     audio: "./audio/fog.wav"
     answer: "slow down to forty"
+    param: { default: 30, unit: m }
+    lcd:
+      phase1: "FOG vis{v}m"
+      phase2: "Slow 40kmh"
   - id: 4
-    label: "결빙 구간"
+    key: icy
+    label: "결빙"
     audio: "./audio/ice.wav"
     answer: "slow down to forty"
+    param: { default: -5, unit: C }
+    lcd:
+      phase1: "ICY {v}C"
+      phase2: "Slow 40 NoLC"
 
 # 차량 기본 설정
 vehicle:
@@ -62,3 +88,32 @@ dummy:
   grip_ok_after: 4 # n초 후 자동으로 핸들 OK
   voice_ok: true # 음성 인식 자동 성공 여부 (더미 모드일 때 사용)
   use_real_voice: false # true면 팀원의 실제 Vosk STT 호출 (마이크/모델/wav 필요)
+
+# ──────────────────────────────────────────────────────────────
+# HMI 하드웨어 설정 (라즈베리파이)
+#   force_sim: true 면 라파에서도 강제로 콘솔 시뮬레이션 (배선 전 로직 테스트용)
+#   라파가 아니거나 RPi.GPIO 가 없으면 자동으로 SIM 모드로 폴백.
+#   pins 는 BCM 번호. I2C(LCD)는 GPIO2(SDA)/GPIO3(SCL) 고정이라 여기 없음.
+# ──────────────────────────────────────────────────────────────
+hmi:
+  force_sim: false
+  pins:
+    led_red: 17 # 경고 LED (빨강)
+    led_green: 27 # 정상/수동전환 LED (초록)
+    buzzer: 22 # 능동 부저
+    vibration: 23 # 진동 모터 (트랜지스터/드라이버 경유)
+    grip_touch: 24 # 핸들 터치 센서 (입력)
+  buzzer_active_high: true # 부저 ON = HIGH
+  vibration_active_high: true # 진동 ON = HIGH
+  grip_active_high: true # 터치 감지 = HIGH (센서에 맞게 조정)
+  lcd:
+    cols: 20 # 20x4 캐릭터 LCD
+    rows: 4
+    i2c_address: 0x27 # PCF8574 백팩 주소 (보통 0x27 또는 0x3F)
+    i2c_port: 1
+
+# 입력 센서 캡쳐 설정
+capture:
+  out_dir: "./data/captures" # 녹음/캡쳐 결과 저장 위치 (.gitignore 처리됨)
+  voice_seconds: 4 # voice raw 녹음 길이 (초)
+  camera_index: 0 # gaze 카메라 인덱스

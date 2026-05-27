@@ -8,6 +8,7 @@ from core.states import (
     STATE_IDLE, STATE_PHASE1, STATE_PHASE2,
     STATE_HANDOVER_OK, STATE_MRM, STATE_END,
 )
+from hmi import lcd, speaker, screens
 
 
 class StateMachine:
@@ -35,13 +36,18 @@ class StateMachine:
         dummy = cfg.get("dummy", {})
         scenario = context["scenario"]
 
-        print("[PHASE2] HMI 가정: 경고 OFF, LCD 동작 지시로 전환")
+        # 경고 OFF(PHASE1 에서 처리됨), LCD 를 동작 지시 화면으로 전환
+        action = scenario["lcd"]["phase2"]               # 예: "Lane 1 GO"
+        speak_sec = round(speaker.duration(scenario["audio"])) or 7
+        lcd.show(*screens.phase2(action, speak_sec))
+        print(f"[PHASE2] 동작 지시: {action} (TTS 안내 {speak_sec}s)")
 
         if dummy.get("use_real_voice", False):
             from core.states.phase2 import run as phase2_run  # 지연 import
             print(f"[PHASE2] 실제 STT 시작 (정답: '{scenario['answer']}')")
             ok = phase2_run(scenario, cfg["voice"])
         else:
+            speaker.play(scenario["audio"])              # TTS 안내음 재생
             ok = bool(dummy.get("voice_ok", True))
             result = "성공" if ok else "실패"
             print(f"[PHASE2] [더미] 음성인식 {result} (정답: '{scenario['answer']}')")
@@ -51,18 +57,25 @@ class StateMachine:
             return STATE_HANDOVER_OK
 
         context["fail_reason"] = "인지 확인 실패"
+        context["fail_code"] = "NoVoice"
         print("[PHASE2] 복창 검증 실패 → MRM")
         return STATE_MRM
 
-    def run(self, scenario):
+    def run(self, scenario, param=None):
         """하나의 시나리오를 처음부터 끝까지 실행.
 
         IDLE → PHASE1 → PHASE2 → (HANDOVER_OK | MRM) → END
+        param: 입력 수치(예: const 400 의 400). None 이면 시나리오 기본값.
         """
+        if param is None:
+            param = scenario.get("param", {}).get("default", 0)
+
         context = {
             "scenario": scenario,
             "config": self.config,
-            "fail_reason": None,  # MRM 진입 시 사유
+            "param": param,       # LCD 경고문에 표시할 수치
+            "fail_reason": None,  # MRM 진입 시 사유(한글)
+            "fail_code": None,    # MRM LCD 표시용 코드(NoGrip 등)
         }
 
         current_state = STATE_IDLE
