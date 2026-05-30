@@ -28,9 +28,11 @@ class StateMachine:
     def _run_phase2(self, context):
         """음성 인식 phase2.run(scenario, voice_cfg) -> bool 을 상태 전이로 매핑.
 
-        dummy.use_real_voice 가 False면 마이크/모델 없이 voice_ok 값으로
-        흐름만 통과시킨다(센서 개발/테스트용). True면 실제 Vosk STT를 호출
-        phase2 모듈은 더미 모드에서 import되지 않도록 지연 import
+        우선순위:
+          1) dummy.voice_ok = true → 항상 성공 처리 (음성 인식 미구현 흐름 통과용)
+          2) dummy.use_real_voice = true → 실제 Vosk STT 호출 (마이크/모델/wav 필요)
+          3) 그 외 → 실패 처리 (MRM 로 이동)
+        phase2 모듈은 더미 모드에서 import되지 않도록 지연 import.
         """
         cfg = context["config"]
         dummy = cfg.get("dummy", {})
@@ -42,15 +44,20 @@ class StateMachine:
         lcd.show(*screens.phase2(action, speak_sec))
         print(f"[PHASE2] 동작 지시: {action} (TTS 안내 {speak_sec}s)")
 
-        if dummy.get("use_real_voice", False):
+        voice_ok_flag = bool(dummy.get("voice_ok", True))
+        if voice_ok_flag:
+            speaker.play(scenario["audio"])              # TTS 안내음 재생
+            ok = True
+            print(f"[PHASE2] [더미] voice_ok=true → 음성인식 성공 처리 "
+                  f"(정답: '{scenario['answer']}')")
+        elif dummy.get("use_real_voice", False):
             from core.states.phase2 import run as phase2_run  # 지연 import
             print(f"[PHASE2] 실제 STT 시작 (정답: '{scenario['answer']}')")
             ok = phase2_run(scenario, cfg["voice"])
         else:
-            speaker.play(scenario["audio"])              # TTS 안내음 재생
-            ok = bool(dummy.get("voice_ok", True))
-            result = "성공" if ok else "실패"
-            print(f"[PHASE2] [더미] 음성인식 {result} (정답: '{scenario['answer']}')")
+            speaker.play(scenario["audio"])
+            ok = False
+            print(f"[PHASE2] [더미] voice_ok=false, use_real_voice=false → 실패 처리")
 
         if ok:
             print("[PHASE2] 복창 검증 통과 → HANDOVER_OK")

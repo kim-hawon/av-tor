@@ -85,9 +85,10 @@ timing:
 # 더미 설정 (센서 연결 전 시뮬레이션)
 dummy:
   gaze_ok_after: 3 # n초 후 자동으로 시선 OK
-  grip_ok_after: 4 # n초 후 자동으로 핸들 OK
-  voice_ok: true # 음성 인식 자동 성공 여부 (더미 모드일 때 사용)
+  grip_ok_after: 4 # n초 후 자동으로 핸들 OK (use_real_grip=false 일 때 적용)
+  voice_ok: true # 음성 인식 자동 성공 여부 (use_real_voice=false 일 때 적용)
   use_real_voice: false # true면 팀원의 실제 Vosk STT 호출 (마이크/모델/wav 필요)
+  use_real_grip: false # true면 실제 터치 센서 사용. false면 grip_ok_after 시간 기반 더미.
 
 # ──────────────────────────────────────────────────────────────
 # HMI 하드웨어 설정 (라즈베리파이)
