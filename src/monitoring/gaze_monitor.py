@@ -68,7 +68,7 @@ def _frame_is_green(lm) -> bool:
 class GazeMonitor:
     """Background capture thread that tracks how long the detection box stays green."""
 
-    def __init__(self, camera_index: int = 0, show_preview: bool = False):
+    def __init__(self, camera_index: int = None, show_preview: bool = False):
         self.camera_index = camera_index
         self.show_preview = show_preview
         self.available = False
@@ -96,15 +96,23 @@ class GazeMonitor:
 
         import cv2
 
-        cap = cv2.VideoCapture(self.camera_index)
-        opened = cap.isOpened()
-        cap.release()
-        if not opened:
+        candidates = [self.camera_index] if self.camera_index is not None else [0, 1]
+        found_index = None
+        for idx in candidates:
+            cap = cv2.VideoCapture(idx)
+            opened = cap.isOpened()
+            cap.release()
+            if opened:
+                found_index = idx
+                break
+
+        if found_index is None:
             print(
-                f"[GAZE] Camera {self.camera_index} not found — no camera gaze detection"
+                f"[GAZE] Camera not found (tried {candidates}) — no camera gaze detection"
             )
             return False
 
+        self.camera_index = found_index
         self.available = True
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True)
