@@ -15,6 +15,7 @@ import time
 from core.states import STATE_PHASE2, STATE_MRM
 from hmi import led, buzzer, vibration, lcd, screens
 from monitoring import grip
+from monitoring.gaze_monitor import GazeMonitor
 
 
 def _alarm_pulse(remaining: int, urgent: int, critical: int):
@@ -58,60 +59,78 @@ def run(context):
     grip.configure(config)
     vibration.on()
 
+    # Start real-time gaze monitor; fall back to dummy if camera is unavailable.
+    gaze_monitor = GazeMonitor(camera_index=0, show_preview=True)
+    use_real_gaze = gaze_monitor.start()
+    if not use_real_gaze:
+        print(f"[PHASE1] No camera — dummy gaze active (ok after {gaze_ok_after}s)")
+
     gaze_ok = False
     grip_ok = False
     start = time.monotonic()
 
-    # tick = 표시될 잔여초. tor_budget 부터 1 까지 1초 간격으로 정확히 한 번씩.
-    for tick in range(tor_budget, 0, -1):
-        remaining = tick
-        elapsed = tor_budget - tick
+    try:
+        # tick = 표시될 잔여초. tor_budget 부터 1 까지 1초 간격으로 정확히 한 번씩.
+        for tick in range(tor_budget, 0, -1):
+            remaining = tick
+            elapsed = tor_budget - tick
 
-        # 시선: 더미 / 그립: 센서(SIM 또는 use_real_grip=false 면 시간 기반 더미)
-        if not gaze_ok and elapsed >= gaze_ok_after:
-            gaze_ok = True
-            print("[PHASE1] [DUMMY] Gaze detected (gaze=OK)")
-        if not grip_ok and grip.is_gripped(elapsed):
-            grip_ok = True
-            print("[PHASE1] Handle grip detected (grip=OK)")
+            # Gaze: real camera (green box >= 1 s) or time-based dummy
+            if not gaze_ok:
+                if use_real_gaze:
+                    if gaze_monitor.is_gaze_ok(required_duration=1.0):
+                        gaze_ok = True
+                        gaze_monitor.stop()
+                        print("[PHASE1] Gaze OK (green detection for 1s) — camera closed")
+                else:
+                    if elapsed >= gaze_ok_after:
+                        gaze_ok = True
+                        print("[PHASE1] [DUMMY] Gaze detected (gaze=OK)")
 
-        # 콘솔 디버깅 로그
-        gaze_str = "OK" if gaze_ok else " X"
-        grip_str = "OK" if grip_ok else " X"
-        print(f"[PHASE1] {remaining}s | gaze=[{gaze_str}] grip=[{grip_str}]")
+            if not grip_ok and grip.is_gripped(elapsed):
+                grip_ok = True
+                print("[PHASE1] Handle grip detected (grip=OK)")
 
-        # HMI 출력
-        lcd.show(*screens.phase1(warn_prefix, remaining, gaze_ok, grip_ok))
+            # 콘솔 디버깅 로그
+            gaze_str = "OK" if gaze_ok else " X"
+            grip_str = "OK" if grip_ok else " X"
+            print(f"[PHASE1] {remaining}s | gaze=[{gaze_str}] grip=[{grip_str}]")
 
-        # 둘 다 충족 → PHASE2 (잠금/펄스 없이 즉시 이탈)
-        if gaze_ok and grip_ok:
-            print("[PHASE1] Conditions met → entering PHASE2")
-            _warnings_off(red_off=True)
-            return STATE_PHASE2
+            # HMI 출력
+            lcd.show(*screens.phase1(warn_prefix, remaining, gaze_ok, grip_ok))
 
-        # 1 틱 분량의 LED+부저 동기 펄스 (잔여가 짧을수록 더 빠르게)
-        _alarm_pulse(remaining, urgent, critical)
+            # 둘 다 충족 → PHASE2 (잠금/펄스 없이 즉시 이탈)
+            if gaze_ok and grip_ok:
+                print("[PHASE1] Conditions met → entering PHASE2")
+                _warnings_off(red_off=True)
+                return STATE_PHASE2
 
-        # 절대시각 기준으로 다음 틱(elapsed+1초)까지 대기 → 드리프트 방지
-        next_deadline = start + (elapsed + 1)
-        sleep_for = next_deadline - time.monotonic()
-        if sleep_for > 0:
-            time.sleep(sleep_for)
+            # 1 틱 분량의 LED+부저 동기 펄스 (잔여가 짧을수록 더 빠르게)
+            _alarm_pulse(remaining, urgent, critical)
 
-    # 시간 초과 → MRM (부족한 조건 기록: LCD 코드 + 콘솔 사유)
-    if not gaze_ok:
-        context["fail_code"] = "NoEye"
-        context["fail_reason"] = "Not looking forward"
-    elif not grip_ok:
-        context["fail_code"] = "NoGrip"
-        context["fail_reason"] = "Handle not gripped"
-    else:
-        context["fail_code"] = "Timeout"
-        context["fail_reason"] = "Unknown"
+            # 절대시각 기준으로 다음 틱(elapsed+1초)까지 대기 → 드리프트 방지
+            next_deadline = start + (elapsed + 1)
+            sleep_for = next_deadline - time.monotonic()
+            if sleep_for > 0:
+                time.sleep(sleep_for)
 
-    print(f"[PHASE1] Timeout → entering MRM (reason: {context['fail_reason']})")
-    _warnings_off(red_off=False)  # 빨강은 MRM 이 이어서 유지
-    return STATE_MRM
+        # 시간 초과 → MRM (부족한 조건 기록: LCD 코드 + 콘솔 사유)
+        if not gaze_ok:
+            context["fail_code"] = "NoEye"
+            context["fail_reason"] = "Not looking forward"
+        elif not grip_ok:
+            context["fail_code"] = "NoGrip"
+            context["fail_reason"] = "Handle not gripped"
+        else:
+            context["fail_code"] = "Timeout"
+            context["fail_reason"] = "Unknown"
+
+        print(f"[PHASE1] Timeout → entering MRM (reason: {context['fail_reason']})")
+        _warnings_off(red_off=False)  # 빨강은 MRM 이 이어서 유지
+        return STATE_MRM
+
+    finally:
+        gaze_monitor.stop()
 
 
 def _warnings_off(red_off: bool):

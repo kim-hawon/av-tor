@@ -24,7 +24,7 @@ voice:
 scenarios:
   - id: 1
     key: const
-    label: "공사 구간"
+    label: "Construction Zone"
     audio: "./audio/const.wav"
     answer: "drive in lane one"
     param: { default: 400, unit: m }
@@ -33,7 +33,7 @@ scenarios:
       phase2: "Lane 1 GO"
   - id: 2
     key: rain
-    label: "우천"
+    label: "Rain"
     audio: "./audio/rain.wav"
     answer: "slow down to sixty four"
     param: { default: 20, unit: mmh }
@@ -42,7 +42,7 @@ scenarios:
       phase2: "Slow 64kmh"
   - id: 3
     key: fog
-    label: "안개"
+    label: "Fog"
     audio: "./audio/fog.wav"
     answer: "slow down to forty"
     param: { default: 30, unit: m }
@@ -51,7 +51,7 @@ scenarios:
       phase2: "Slow 40kmh"
   - id: 4
     key: icy
-    label: "결빙"
+    label: "Icy Road"
     audio: "./audio/ice.wav"
     answer: "slow down to forty"
     param: { default: -5, unit: C }
