@@ -16,23 +16,29 @@ Usage:
     else:
         # fall back to time-based dummy logic
 """
+
 import os
 import threading
 import time
 
 import numpy as np
 
-EAR_THRESHOLD  = 0.2
+EAR_THRESHOLD = 0.2
 NOSE_RATIO_MIN = 0.4
 NOSE_RATIO_MAX = 0.6
 
 # shape_predictor sits next to realtime_drowsiness.py at the workspace root
 # This file lives at  src/monitoring/gaze_monitor.py  → 2 levels up = root
-_DLIB_MODEL = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..", "..",
-    "shape_predictor_68_face_landmarks.dat",
-))
+_DLIB_MODEL = os.path.normpath(
+    os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "..",
+        "models",
+        "68_face",
+        "shape_predictor_68_face_landmarks.dat",
+    )
+)
 
 
 def _dist(a, b):
@@ -40,11 +46,13 @@ def _dist(a, b):
 
 
 def _ear(eye):
-    return (_dist(eye[1], eye[5]) + _dist(eye[2], eye[4])) / (2.0 * _dist(eye[0], eye[3]))
+    return (_dist(eye[1], eye[5]) + _dist(eye[2], eye[4])) / (
+        2.0 * _dist(eye[0], eye[3])
+    )
 
 
 def _nose_ratio(lm):
-    left_cx  = sum(lm[i][0] for i in range(36, 42)) / 6.0
+    left_cx = sum(lm[i][0] for i in range(36, 42)) / 6.0
     right_cx = sum(lm[i][0] for i in range(42, 48)) / 6.0
     if right_cx == left_cx:
         return 0.5
@@ -52,7 +60,7 @@ def _nose_ratio(lm):
 
 
 def _frame_is_green(lm) -> bool:
-    ear   = (_ear(lm[36:42]) + _ear(lm[42:48])) / 2.0
+    ear = (_ear(lm[36:42]) + _ear(lm[42:48])) / 2.0
     ratio = _nose_ratio(lm)
     return ear > EAR_THRESHOLD and NOSE_RATIO_MIN <= ratio <= NOSE_RATIO_MAX
 
@@ -63,11 +71,11 @@ class GazeMonitor:
     def __init__(self, camera_index: int = 0, show_preview: bool = False):
         self.camera_index = camera_index
         self.show_preview = show_preview
-        self.available    = False
-        self._lock        = threading.Lock()
-        self._green_since = None   # monotonic timestamp when green streak started
-        self._running     = False
-        self._thread      = None
+        self.available = False
+        self._lock = threading.Lock()
+        self._green_since = None  # monotonic timestamp when green streak started
+        self._running = False
+        self._thread = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -87,19 +95,24 @@ class GazeMonitor:
             return False
 
         import cv2
+
         cap = cv2.VideoCapture(self.camera_index)
         opened = cap.isOpened()
         cap.release()
         if not opened:
-            print(f"[GAZE] Camera {self.camera_index} not found — no camera gaze detection")
+            print(
+                f"[GAZE] Camera {self.camera_index} not found — no camera gaze detection"
+            )
             return False
 
         self.available = True
-        self._running  = True
-        self._thread   = threading.Thread(target=self._run, daemon=True)
+        self._running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         preview_note = " (preview window ON)" if self.show_preview else ""
-        print(f"[GAZE] Camera {self.camera_index} detected — real-time gaze monitoring active{preview_note}")
+        print(
+            f"[GAZE] Camera {self.camera_index} detected — real-time gaze monitoring active{preview_note}"
+        )
         return True
 
     def stop(self):
@@ -123,11 +136,11 @@ class GazeMonitor:
         import cv2
         import dlib
 
-        detector  = dlib.get_frontal_face_detector()
+        detector = dlib.get_frontal_face_detector()
         predictor = dlib.shape_predictor(_DLIB_MODEL)
 
         cap = cv2.VideoCapture(self.camera_index)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
         while self._running:
@@ -136,36 +149,59 @@ class GazeMonitor:
                 time.sleep(0.05)
                 continue
 
-            h, w  = frame.shape[:2]
-            gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            h, w = frame.shape[:2]
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = detector(gray, 1)
 
             green = False
             if faces:
-                rect  = faces[0]
+                rect = faces[0]
                 shape = predictor(gray, rect)
-                lm    = [(shape.part(i).x, shape.part(i).y) for i in range(68)]
+                lm = [(shape.part(i).x, shape.part(i).y) for i in range(68)]
                 green = _frame_is_green(lm)
 
                 if self.show_preview:
-                    ear   = (_ear(lm[36:42]) + _ear(lm[42:48])) / 2.0
+                    ear = (_ear(lm[36:42]) + _ear(lm[42:48])) / 2.0
                     ratio = _nose_ratio(lm)
-                    x1 = max(0, rect.left());  y1 = max(0, rect.top())
-                    x2 = min(w, rect.right()); y2 = min(h, rect.bottom())
+                    x1 = max(0, rect.left())
+                    y1 = max(0, rect.top())
+                    x2 = min(w, rect.right())
+                    y2 = min(h, rect.bottom())
                     box_color = (0, 200, 60) if green else (0, 0, 255)
                     cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
-                    for (lx, ly) in lm:
+                    for lx, ly in lm:
                         cv2.circle(frame, (lx, ly), 1, (0, 200, 255), -1)
-                    cv2.putText(frame, f"EAR:{ear:.2f}  Nose:{ratio:.2f}",
-                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (220, 220, 220), 2)
+                    cv2.putText(
+                        frame,
+                        f"EAR:{ear:.2f}  Nose:{ratio:.2f}",
+                        (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (220, 220, 220),
+                        2,
+                    )
                     label = "Gaze OK" if green else "Gaze NG"
                     label_color = (0, 200, 60) if green else (0, 0, 255)
-                    cv2.putText(frame, label, (10, 60),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, label_color, 2)
+                    cv2.putText(
+                        frame,
+                        label,
+                        (10, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.8,
+                        label_color,
+                        2,
+                    )
             else:
                 if self.show_preview:
-                    cv2.putText(frame, "No face detected", (10, 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (80, 80, 255), 2)
+                    cv2.putText(
+                        frame,
+                        "No face detected",
+                        (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.8,
+                        (80, 80, 255),
+                        2,
+                    )
 
             with self._lock:
                 if green:
