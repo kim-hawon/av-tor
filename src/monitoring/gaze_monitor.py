@@ -155,8 +155,15 @@ class GazeMonitor:
         predictor = dlib.shape_predictor(_DLIB_MODEL)
 
         cap = cv2.VideoCapture(self.camera_index)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)   # Pi: 320x240이 4배 빠름
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+
+        # dlib 검출은 2프레임마다 한 번 — 마지막 결과를 캐시해서 재사용
+        _DETECT_EVERY = 2
+        frame_count = 0
+        last_rect = None
+        last_lm = None
+        green = False
 
         while self._running:
             ret, frame = cap.read()
@@ -166,57 +173,63 @@ class GazeMonitor:
 
             h, w = frame.shape[:2]
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = detector(gray, 1)
 
-            green = False
-            if faces:
-                rect = faces[0]
-                shape = predictor(gray, rect)
-                lm = [(shape.part(i).x, shape.part(i).y) for i in range(68)]
-                green = _frame_is_green(lm)
+            if frame_count % _DETECT_EVERY == 0:
+                # 업샘플링 0: 이미지 원본 크기로만 검출 (Pi에서 2-4배 빠름)
+                faces = detector(gray, 0)
+                if faces:
+                    last_rect = faces[0]
+                    shape = predictor(gray, last_rect)
+                    last_lm = [(shape.part(i).x, shape.part(i).y) for i in range(68)]
+                    green = _frame_is_green(last_lm)
+                else:
+                    last_rect = None
+                    last_lm = None
+                    green = False
+            frame_count += 1
 
-                if self.show_preview:
-                    ear = (_ear(lm[36:42]) + _ear(lm[42:48])) / 2.0
-                    ratio = _nose_ratio(lm)
-                    x1 = max(0, rect.left())
-                    y1 = max(0, rect.top())
-                    x2 = min(w, rect.right())
-                    y2 = min(h, rect.bottom())
+            if self.show_preview:
+                if last_lm is not None:
+                    ear = (_ear(last_lm[36:42]) + _ear(last_lm[42:48])) / 2.0
+                    ratio = _nose_ratio(last_lm)
+                    x1 = max(0, last_rect.left())
+                    y1 = max(0, last_rect.top())
+                    x2 = min(w, last_rect.right())
+                    y2 = min(h, last_rect.bottom())
                     box_color = (0, 200, 60) if green else (0, 0, 255)
                     cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
-                    for lx, ly in lm:
-                        cv2.circle(frame, (lx, ly), 1, (0, 200, 255), -1)
                     cv2.putText(
                         frame,
                         f"EAR:{ear:.2f}  Nose:{ratio:.2f}",
-                        (10, 30),
+                        (10, 20),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
+                        0.5,
                         (220, 220, 220),
-                        2,
+                        1,
                     )
                     label = "Gaze OK" if green else "Gaze NG"
                     label_color = (0, 200, 60) if green else (0, 0, 255)
                     cv2.putText(
                         frame,
                         label,
-                        (10, 60),
+                        (10, 40),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.8,
+                        0.6,
                         label_color,
                         2,
                     )
-            else:
-                if self.show_preview:
+                else:
                     cv2.putText(
                         frame,
-                        "No face detected",
-                        (10, 30),
+                        "No face",
+                        (10, 20),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.8,
+                        0.6,
                         (80, 80, 255),
-                        2,
+                        1,
                     )
+                with self._frame_lock:
+                    self._preview_frame = frame  # cap.read()가 매번 새 배열을 반환하므로 copy 불필요
 
             with self._lock:
                 if green:
@@ -224,9 +237,5 @@ class GazeMonitor:
                         self._green_since = time.monotonic()
                 else:
                     self._green_since = None
-
-            if self.show_preview:
-                with self._frame_lock:
-                    self._preview_frame = frame.copy()
 
         cap.release()
