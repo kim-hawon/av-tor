@@ -55,7 +55,7 @@ def urgency(remaining: float, urgent: float = 5, critical: float = 3):
         beep(on_time=0.08, off_time=0.08, count=2)
     else:
         if gpio_setup.is_sim():
-            print("[BUZZER][SIM] 🔊🔊 위급! 연속음 ━━━")
+            print("[BUZZER][SIM] 🔊🔊 Critical! Continuous tone ━━━")
             return
         on()
         time.sleep(0.4)
@@ -64,7 +64,7 @@ def urgency(remaining: float, urgent: float = 5, critical: float = 3):
 
 if __name__ == "__main__":
     gpio_setup.setup()
-    print("[TEST] 부저 패턴 테스트")
+    print("[TEST] Buzzer pattern test")
     try:
         for rem in (8, 4, 2):
             print(f"  remaining={rem}s")
@@ -73,4 +73,4 @@ if __name__ == "__main__":
     finally:
         off()
         gpio_setup.cleanup()
-        print("[TEST] 종료")
+        print("[TEST] Done")

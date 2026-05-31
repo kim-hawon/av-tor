@@ -25,28 +25,28 @@ def record(out_path: str, seconds: float = 4.0, samplerate: int = 16000) -> str:
     sounddevice 가 없으면(맥/PC 라이브러리 미설치) 콘솔 시뮬레이션만 한다.
     """
     if not _HAS_SD:
-        print(f"[VOICE][SIM] 🎤 {seconds:.0f}s 녹음 (가정) → {out_path}")
+        print(f"[VOICE][SIM] 🎤 {seconds:.0f}s recording (simulated) → {out_path}")
         return out_path
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    print(f"[VOICE] 🎤 녹음 시작 ({seconds:.0f}s)...")
+    print(f"[VOICE] 🎤 Recording started ({seconds:.0f}s)...")
     frames = int(seconds * samplerate)
     audio = sd.rec(frames, samplerate=samplerate, channels=1, dtype="int16")
     sd.wait()
     sf.write(out_path, audio, samplerate)
-    print(f"[VOICE] 저장 완료: {out_path}")
+    print(f"[VOICE] Saved: {out_path}")
     return out_path
 
 
 if __name__ == "__main__":
     out_dir = "./data/captures"
     out = os.path.join(out_dir, f"voice_{int(time.time())}.wav")
-    print("[TEST] 마이크 raw 녹음 테스트")
+    print("[TEST] Microphone raw recording test")
     record(out, seconds=4.0)
     # 녹음 검증: 재생
     from hmi import speaker
     speaker.play(out)
-    print("[TEST] 종료")
+    print("[TEST] Done")
 
 
 # ─────────────────────────────────────────────────────────────

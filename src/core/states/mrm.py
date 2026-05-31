@@ -15,7 +15,7 @@ from hmi import led, buzzer, lcd, screens
 def run(context):
     config = context["config"]
     duration = config["timing"]["end_screen_duration"]
-    reason = context.get("fail_reason", "알 수 없음")
+    reason = context.get("fail_reason", "Unknown")
     reason_code = context.get("fail_code", "Unknown")
 
     led.green_off()
@@ -23,9 +23,9 @@ def run(context):
     lcd.show(*screens.mrm(reason_code))
     buzzer.beep(on_time=0.2, off_time=0.15, count=3)
 
-    print(f"[MRM] 비상 정차 (사유: {reason} / {reason_code})")
-    print("[MRM] 단계적 감속 시뮬레이션...")
+    print(f"[MRM] Emergency stop (reason: {reason} / {reason_code})")
+    print("[MRM] Gradual deceleration simulation...")
     time.sleep(duration)
     buzzer.off()
-    print("[MRM] 정차 완료")
+    print("[MRM] Vehicle stopped")
     return STATE_END

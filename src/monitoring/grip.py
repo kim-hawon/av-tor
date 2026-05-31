@@ -50,9 +50,9 @@ def is_gripped(elapsed: float = 0.0) -> bool:
 if __name__ == "__main__":
     import time
     gpio_setup.setup()
-    print("[TEST] 그립 터치 센서 값 출력 (Ctrl+C 로 종료)")
+    print("[TEST] Grip touch sensor output (Press Ctrl+C to exit)")
     if gpio_setup.is_sim():
-        print("  (SIM 모드 — 실제 센서가 없어 항상 0 으로 표시됩니다)")
+        print("  (SIM mode — no real sensor, always shows 0)")
     try:
         while True:
             raw = read_raw()
@@ -62,4 +62,4 @@ if __name__ == "__main__":
         pass
     finally:
         gpio_setup.cleanup()
-        print("\n[TEST] 종료")
+        print("\n[TEST] Done")

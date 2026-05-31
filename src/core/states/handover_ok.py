@@ -15,8 +15,8 @@ def run(context):
     led.red_off()
     led.green_on()
     lcd.show(*screens.handover_ok())
-    print(f"[HANDOVER_OK] 제어권 전환 성공! → MANUAL MODE ({duration}초 표시)")
+    print(f"[HANDOVER_OK] Takeover successful! → MANUAL MODE (displaying for {duration}s)")
 
     time.sleep(duration)
-    print("[HANDOVER_OK] 시나리오 종료")
+    print("[HANDOVER_OK] Scenario complete")
     return STATE_END

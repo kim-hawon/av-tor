@@ -16,6 +16,6 @@ def run(context):
     vibration.off()
     lcd.show(*screens.idle())
 
-    print(f"[IDLE] 시나리오 수신: {scenario['label']} (id={scenario['id']})")
-    print("[IDLE] → PHASE1 전이")
+    print(f"[IDLE] Scenario received: {scenario['label']} (id={scenario['id']})")
+    print("[IDLE] → Transitioning to PHASE1")
     return STATE_PHASE1

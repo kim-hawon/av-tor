@@ -24,16 +24,16 @@ import hmi
 
 def print_banner(scenarios, use_real_voice, sim):
     print("=" * 52)
-    print("  AV-TOR: 자율주행 제어권 전환 시스템 (데모)")
-    print(f"  음성인식 모드: {'실제 STT' if use_real_voice else '더미'}")
-    print(f"  HMI 모드: {'콘솔 시뮬레이션(SIM)' if sim else '실제 하드웨어'}")
+    print("  AV-TOR: Autonomous Driving Takeover Request System (Demo)")
+    print(f"  Voice mode: {'Real STT' if use_real_voice else 'Dummy'}")
+    print(f"  HMI mode: {'Console SIM' if sim else 'Real hardware'}")
     print("=" * 52)
-    print("시나리오를 입력하세요  <키워드> [수치] :")
+    print("Enter a scenario  <keyword> [value] :")
     for s in scenarios:
         unit = s.get("param", {}).get("unit", "")
         default = s.get("param", {}).get("default", "")
-        print(f"  {s['key']:<6} [{default}{unit}]  {s['label']}  (번호 {s['id']})")
-    print("  예) const 400 / rain 20 / fog 30 / icy -5      종료: q")
+        print(f"  {s['key']:<6} [{default}{unit}]  {s['label']}  (id {s['id']})")
+    print("  e.g.) const 400 / rain 20 / fog 30 / icy -5      quit: q")
     print()
 
 
@@ -59,7 +59,7 @@ def parse_trigger(user_input, scenarios):
         try:
             param = int(parts[1])   # 음수(-5)도 처리됨
         except ValueError:
-            print(f"[ERROR] 수치는 정수여야 합니다: '{parts[1]}' → 기본값 사용")
+            print(f"[ERROR] Value must be an integer: '{parts[1]}' → using default")
     return sc, param
 
 
@@ -80,19 +80,19 @@ def main():
             try:
                 user_input = input("Trigger > ").strip()
             except (EOFError, KeyboardInterrupt):
-                print("\n프로그램 종료")
+                print("\nProgram exiting")
                 break
 
             if user_input.lower() == "q":
-                print("프로그램 종료")
+                print("Program exiting")
                 break
             if not user_input:
                 continue
 
             scenario, param = parse_trigger(user_input, scenarios)
             if scenario is None:
-                print(f"[ERROR] 알 수 없는 입력: '{user_input}' "
-                      f"(예: const 400 / 1 / q)")
+                print(f"[ERROR] Unknown input: '{user_input}' "
+                      f"(e.g.: const 400 / 1 / q)")
                 continue
 
             sm.run(scenario, param)

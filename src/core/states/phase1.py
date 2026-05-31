@@ -54,7 +54,7 @@ def run(context):
     # LCD 1행 경고문(예: "WARN:400m"). {v} 에 입력 수치를 치환.
     warn_prefix = scenario["lcd"]["phase1"].format(v=value)
 
-    print(f"[PHASE1] TOR 경고 시작 ({scenario['label']}, {warn_prefix})")
+    print(f"[PHASE1] TOR warning started ({scenario['label']}, {warn_prefix})")
     grip.configure(config)
     vibration.on()
 
@@ -70,10 +70,10 @@ def run(context):
         # 시선: 더미 / 그립: 센서(SIM 또는 use_real_grip=false 면 시간 기반 더미)
         if not gaze_ok and elapsed >= gaze_ok_after:
             gaze_ok = True
-            print("[PHASE1] [더미] 시선 감지됨 (gaze=OK)")
+            print("[PHASE1] [DUMMY] Gaze detected (gaze=OK)")
         if not grip_ok and grip.is_gripped(elapsed):
             grip_ok = True
-            print("[PHASE1] 핸들 파지 감지됨 (grip=OK)")
+            print("[PHASE1] Handle grip detected (grip=OK)")
 
         # 콘솔 디버깅 로그
         gaze_str = "OK" if gaze_ok else " X"
@@ -85,7 +85,7 @@ def run(context):
 
         # 둘 다 충족 → PHASE2 (잠금/펄스 없이 즉시 이탈)
         if gaze_ok and grip_ok:
-            print("[PHASE1] 조건 충족 → PHASE2 진입")
+            print("[PHASE1] Conditions met → entering PHASE2")
             _warnings_off(red_off=True)
             return STATE_PHASE2
 
@@ -101,15 +101,15 @@ def run(context):
     # 시간 초과 → MRM (부족한 조건 기록: LCD 코드 + 콘솔 사유)
     if not gaze_ok:
         context["fail_code"] = "NoEye"
-        context["fail_reason"] = "전방 미주시"
+        context["fail_reason"] = "Not looking forward"
     elif not grip_ok:
         context["fail_code"] = "NoGrip"
-        context["fail_reason"] = "핸들 미파지"
+        context["fail_reason"] = "Handle not gripped"
     else:
         context["fail_code"] = "Timeout"
-        context["fail_reason"] = "알 수 없음"
+        context["fail_reason"] = "Unknown"
 
-    print(f"[PHASE1] 시간 초과 → MRM 진입 (사유: {context['fail_reason']})")
+    print(f"[PHASE1] Timeout → entering MRM (reason: {context['fail_reason']})")
     _warnings_off(red_off=False)  # 빨강은 MRM 이 이어서 유지
     return STATE_MRM
 

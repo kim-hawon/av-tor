@@ -38,7 +38,7 @@ def init(config=None):
     # GPIO 가 SIM 이거나 RPLCD 가 없으면 LCD 도 SIM
     if gpio_setup.is_sim() or not _HAS_RPLCD:
         _sim = True
-        print(f"[LCD] SIM 모드 ({_cols}x{_rows}) — 콘솔에 화면을 표시합니다")
+        print(f"[LCD] SIM mode ({_cols}x{_rows}) — showing screen in console")
         return
 
     try:
@@ -51,9 +51,9 @@ def init(config=None):
         )
         _sim = False
         _lcd.clear()
-        print(f"[LCD] 실제 I2C LCD 초기화 완료 ({_cols}x{_rows})")
+        print(f"[LCD] Real I2C LCD initialized ({_cols}x{_rows})")
     except Exception as e:  # noqa: BLE001 - 하드웨어 문제는 SIM 으로 폴백
-        print(f"[LCD] 초기화 실패 → SIM 폴백: {e}")
+        print(f"[LCD] Init failed → falling back to SIM: {e}")
         _sim = True
 
 
@@ -112,11 +112,11 @@ def _print_box(rows):
 if __name__ == "__main__":
     gpio_setup.setup()
     init()
-    print("[TEST] LCD 출력 테스트")
+    print("[TEST] LCD output test")
     show("WARN:400m  10s", "Eye:X Grip:X")
     import time
     time.sleep(1)
     show("HANDOVER OK", "MANUAL MODE")
     clear()
     close()
-    print("[TEST] 종료")
+    print("[TEST] Done")

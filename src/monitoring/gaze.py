@@ -27,7 +27,7 @@ def capture(out_path: str, camera_index: int = 0) -> str:
     cv2 가 없거나 카메라가 없으면 콘솔 시뮬레이션만 한다(저장 안 함).
     """
     if not _HAS_CV2:
-        print(f"[GAZE][SIM] 📷 프레임 캡쳐 (가정) → {out_path}")
+        print(f"[GAZE][SIM] 📷 Frame capture (simulated) → {out_path}")
         return out_path
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
@@ -35,10 +35,10 @@ def capture(out_path: str, camera_index: int = 0) -> str:
     try:
         ok, frame = cap.read()
         if not ok:
-            print("[GAZE] ⚠ 카메라 프레임 읽기 실패")
+            print("[GAZE] ⚠ Failed to read camera frame")
             return ""
         cv2.imwrite(out_path, frame)
-        print(f"[GAZE] 저장 완료: {out_path}")
+        print(f"[GAZE] Saved: {out_path}")
         return out_path
     finally:
         cap.release()
@@ -47,6 +47,6 @@ def capture(out_path: str, camera_index: int = 0) -> str:
 if __name__ == "__main__":
     out_dir = "./data/captures"
     out = os.path.join(out_dir, f"gaze_{int(time.time())}.jpg")
-    print("[TEST] 카메라 프레임 캡쳐 테스트")
+    print("[TEST] Camera frame capture test")
     capture(out)
-    print("[TEST] 종료")
+    print("[TEST] Done")

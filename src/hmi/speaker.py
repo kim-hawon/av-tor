@@ -29,25 +29,25 @@ def play(path: str, block: bool = True) -> float:
     """
     name = os.path.basename(path)
     if not os.path.exists(path):
-        print(f"[SPK] ⚠ 파일 없음: {path}")
+        print(f"[SPK] ⚠ File not found: {path}")
         return 0.0
 
     if _HAS_SD:
         data, sr = sf.read(path)
         duration = len(data) / float(sr)
-        print(f"[SPK] ▶ 재생: {name} ({duration:.1f}s)")
+        print(f"[SPK] ▶ Playing: {name} ({duration:.1f}s)")
         sd.play(data, sr)
         if block:
             sd.wait()
         return duration
 
     if shutil.which("aplay"):
-        print(f"[SPK] ▶ aplay 재생: {name}")
+        print(f"[SPK] ▶ aplay playing: {name}")
         run = subprocess.run if block else subprocess.Popen
         run(["aplay", "-q", path])
         return 0.0
 
-    print(f"[SPK][SIM] 🔈 재생: {name}")
+    print(f"[SPK][SIM] 🔈 Playing: {name}")
     return 0.0
 
 
@@ -62,6 +62,6 @@ def duration(path: str) -> float:
 if __name__ == "__main__":
     import sys
     target = sys.argv[1] if len(sys.argv) > 1 else "./audio/const.wav"
-    print(f"[TEST] 스피커 재생 테스트: {target}")
+    print(f"[TEST] Speaker playback test: {target}")
     play(target)
-    print("[TEST] 종료")
+    print("[TEST] Done")

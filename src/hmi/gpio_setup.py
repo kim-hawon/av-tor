@@ -67,8 +67,8 @@ def setup(config=None):
     _sim = force_sim or not _HAS_GPIO
 
     if _sim:
-        reason = "force_sim=true" if force_sim else "RPi.GPIO 없음(비 라즈베리파이)"
-        print(f"[GPIO] SIM 모드 ({reason}) — 콘솔로 하드웨어 동작을 표시합니다")
+        reason = "force_sim=true" if force_sim else "No RPi.GPIO (not a Raspberry Pi)"
+        print(f"[GPIO] SIM mode ({reason}) — displaying hardware state in console")
         _ready = True
         return
 
@@ -80,7 +80,7 @@ def setup(config=None):
     for name in _INPUT_PINS:
         GPIO.setup(_pins[name], GPIO.IN, pull_up_down=pud)
     _ready = True
-    print(f"[GPIO] 실제 GPIO 초기화 완료 (BCM): {_pins}")
+    print(f"[GPIO] Real GPIO initialized (BCM): {_pins}")
 
 
 def write(name: str, high: bool):

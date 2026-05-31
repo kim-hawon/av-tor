@@ -62,7 +62,7 @@ def red_blink(times: int = 3, interval: float = 0.3):
 if __name__ == "__main__":
     import time
     gpio_setup.setup()  # config 없이 기본 핀으로
-    print("[TEST] Red/Green LED 점멸 테스트 (Ctrl+C 로 종료)")
+    print("[TEST] Red/Green LED blink test (Press Ctrl+C to exit)")
     try:
         while True:
             red_on(); green_off(); time.sleep(0.5)
@@ -72,4 +72,4 @@ if __name__ == "__main__":
     finally:
         all_off()
         gpio_setup.cleanup()
-        print("\n[TEST] 종료")
+        print("\n[TEST] Done")

@@ -25,7 +25,7 @@ def on():
     _on = True
     gpio_setup.write("vibration", _active_high)
     if gpio_setup.is_sim():
-        print("[VIB][SIM] 📳 진동 ON")
+        print("[VIB][SIM] 📳 Vibration ON")
 
 
 def off():
@@ -35,7 +35,7 @@ def off():
     _on = False
     gpio_setup.write("vibration", not _active_high)
     if gpio_setup.is_sim():
-        print("[VIB][SIM] 📴 진동 OFF")
+        print("[VIB][SIM] 📴 Vibration OFF")
 
 
 def pulse(duration: float = 0.5):
@@ -47,7 +47,7 @@ def pulse(duration: float = 0.5):
 
 if __name__ == "__main__":
     gpio_setup.setup()
-    print("[TEST] 진동 모터 ON/OFF 테스트 (Ctrl+C 로 종료)")
+    print("[TEST] Vibration motor ON/OFF test (Press Ctrl+C to exit)")
     try:
         while True:
             on(); time.sleep(0.5)
@@ -57,4 +57,4 @@ if __name__ == "__main__":
     finally:
         off()
         gpio_setup.cleanup()
-        print("\n[TEST] 종료")
+        print("\n[TEST] Done")

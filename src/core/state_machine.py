@@ -42,30 +42,30 @@ class StateMachine:
         action = scenario["lcd"]["phase2"]               # 예: "Lane 1 GO"
         speak_sec = round(speaker.duration(scenario["audio"])) or 7
         lcd.show(*screens.phase2(action, speak_sec))
-        print(f"[PHASE2] 동작 지시: {action} (TTS 안내 {speak_sec}s)")
+        print(f"[PHASE2] Action: {action} (TTS guidance {speak_sec}s)")
 
         voice_ok_flag = bool(dummy.get("voice_ok", True))
         if voice_ok_flag:
             speaker.play(scenario["audio"])              # TTS 안내음 재생
             ok = True
-            print(f"[PHASE2] [더미] voice_ok=true → 음성인식 성공 처리 "
-                  f"(정답: '{scenario['answer']}')")
+            print(f"[PHASE2] [DUMMY] voice_ok=true → voice recognition success "
+                  f"(expected: '{scenario['answer']}')")
         elif dummy.get("use_real_voice", False):
             from core.states.phase2 import run as phase2_run  # 지연 import
-            print(f"[PHASE2] 실제 STT 시작 (정답: '{scenario['answer']}')")
+            print(f"[PHASE2] Starting real STT (expected: '{scenario['answer']}')")
             ok = phase2_run(scenario, cfg["voice"])
         else:
             speaker.play(scenario["audio"])
             ok = False
-            print(f"[PHASE2] [더미] voice_ok=false, use_real_voice=false → 실패 처리")
+            print(f"[PHASE2] [DUMMY] voice_ok=false, use_real_voice=false → fail")
 
         if ok:
-            print("[PHASE2] 복창 검증 통과 → HANDOVER_OK")
+            print("[PHASE2] Voice verification passed → HANDOVER_OK")
             return STATE_HANDOVER_OK
 
-        context["fail_reason"] = "인지 확인 실패"
+        context["fail_reason"] = "Cognitive check failed"
         context["fail_code"] = "NoVoice"
-        print("[PHASE2] 복창 검증 실패 → MRM")
+        print("[PHASE2] Voice verification failed → MRM")
         return STATE_MRM
 
     def run(self, scenario, param=None):
@@ -89,6 +89,6 @@ class StateMachine:
         while current_state != STATE_END:
             handler = self.handlers.get(current_state)
             if handler is None:
-                print(f"[ERROR] 알 수 없는 상태: {current_state}")
+                print(f"[ERROR] Unknown state: {current_state}")
                 break
             current_state = handler(context)
