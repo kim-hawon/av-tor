@@ -10,6 +10,7 @@
   카운트다운은 절대시각(monotonic) 기준으로 1초마다 정확히 한 틱씩 진행한다.
   매 틱마다 LED+부저를 동기 펄스로 울리며, 잔여시간이 짧을수록 더 빠르게 깜빡/삐삐.
 """
+
 import time
 
 from core.states import STATE_PHASE2, STATE_MRM
@@ -60,10 +61,15 @@ def run(context):
     vibration.on()
 
     # Start real-time gaze monitor; fall back to dummy if camera is unavailable.
-    gaze_monitor = GazeMonitor(camera_index=0, show_preview=True)
+    gaze_monitor = GazeMonitor(camera_index=None, show_preview=True)
     use_real_gaze = gaze_monitor.start()
     if not use_real_gaze:
         print(f"[PHASE1] No camera — dummy gaze active (ok after {gaze_ok_after}s)")
+
+    # cv2 window must be driven from the main thread (Windows HighGUI constraint).
+    show_preview = use_real_gaze and gaze_monitor.show_preview
+    if show_preview:
+        import cv2
 
     gaze_ok = False
     grip_ok = False
@@ -81,7 +87,13 @@ def run(context):
                     if gaze_monitor.is_gaze_ok(required_duration=1.0):
                         gaze_ok = True
                         gaze_monitor.stop()
-                        print("[PHASE1] Gaze OK (green detection for 1s) — camera closed")
+                        if show_preview:
+                            cv2.destroyAllWindows()
+                            cv2.waitKey(1)
+                            show_preview = False
+                        print(
+                            "[PHASE1] Gaze OK (green detection for 1s) — camera closed"
+                        )
                 else:
                     if elapsed >= gaze_ok_after:
                         gaze_ok = True
@@ -109,10 +121,21 @@ def run(context):
             _alarm_pulse(remaining, urgent, critical)
 
             # 절대시각 기준으로 다음 틱(elapsed+1초)까지 대기 → 드리프트 방지
+            # show_preview 모드에서는 대기 중 cv2 이벤트 루프를 펌핑해 창을 갱신한다.
             next_deadline = start + (elapsed + 1)
-            sleep_for = next_deadline - time.monotonic()
-            if sleep_for > 0:
-                time.sleep(sleep_for)
+            if show_preview:
+                while True:
+                    remaining_sleep = next_deadline - time.monotonic()
+                    if remaining_sleep <= 0:
+                        break
+                    frame = gaze_monitor.get_preview_frame()
+                    if frame is not None:
+                        cv2.imshow("Gaze Monitor", frame)
+                    cv2.waitKey(max(1, min(30, int(remaining_sleep * 1000))))
+            else:
+                sleep_for = next_deadline - time.monotonic()
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
 
         # 시간 초과 → MRM (부족한 조건 기록: LCD 코드 + 콘솔 사유)
         if not gaze_ok:
@@ -130,6 +153,9 @@ def run(context):
         return STATE_MRM
 
     finally:
+        if show_preview:
+            cv2.destroyAllWindows()
+            cv2.waitKey(1)
         gaze_monitor.stop()
 
 

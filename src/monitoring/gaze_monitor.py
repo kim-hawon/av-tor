@@ -76,6 +76,8 @@ class GazeMonitor:
         self._green_since = None  # monotonic timestamp when green streak started
         self._running = False
         self._thread = None
+        self._preview_frame = None   # latest annotated frame; displayed by main thread
+        self._frame_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -128,6 +130,11 @@ class GazeMonitor:
         if self._thread:
             self._thread.join(timeout=2.0)
             self._thread = None
+
+    def get_preview_frame(self):
+        """Return the latest annotated frame for display in the main thread."""
+        with self._frame_lock:
+            return self._preview_frame
 
     def is_gaze_ok(self, required_duration: float = 1.0) -> bool:
         """True if detection box has been green for >= required_duration seconds."""
@@ -219,10 +226,7 @@ class GazeMonitor:
                     self._green_since = None
 
             if self.show_preview:
-                cv2.imshow("Gaze Monitor", frame)
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    self._running = False
+                with self._frame_lock:
+                    self._preview_frame = frame.copy()
 
         cap.release()
-        if self.show_preview:
-            cv2.destroyWindow("Gaze Monitor")
