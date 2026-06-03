@@ -16,9 +16,18 @@
 음성인식은 config 의 dummy.use_real_voice 로 더미/실제(STT) 전환.
 음성 단독 테스트 진입점은 src/main.py 에 그대로 있음.
 """
+try:
+    from dotenv import load_dotenv
+    # av-tor/.env 를 가장 먼저 로드 (TG_BOT_TOKEN, TG_CHAT_ID 등).
+    # 파일 없거나 dotenv 미설치여도 조용히 통과 — 환경변수가 이미 있으면 그대로 사용.
+    load_dotenv()
+except ImportError:
+    pass
+
 from core.scenario import load_config
 from core.state_machine import StateMachine
 from monitoring import grip
+from iot import telegram_notify
 import hmi
 
 
@@ -71,6 +80,7 @@ def main():
     # HMI/센서 초기화 (라파=실제, 그 외=SIM 자동 폴백)
     hmi.setup_all(config)
     grip.configure(config)
+    telegram_notify.configure(config)
 
     sm = StateMachine(config)
     print_banner(scenarios, use_real_voice, hmi.gpio_setup.is_sim())

@@ -118,3 +118,14 @@ capture:
   out_dir: "./data/captures" # 녹음/캡쳐 결과 저장 위치 (.gitignore 처리됨)
   voice_seconds: 4 # voice raw 녹음 길이 (초)
   camera_index: 0 # gaze 카메라 인덱스
+
+# ──────────────────────────────────────────────────────────────
+# 텔레그램 알림 (제어권 전환 성공/실패 시 메시지 전송)
+#   bot_token / chat_id 는 환경변수(TG_BOT_TOKEN, TG_CHAT_ID)로 주는 것을 권장.
+#   yaml 값과 환경변수가 모두 있으면 환경변수가 우선.
+# ──────────────────────────────────────────────────────────────
+telegram:
+  enabled: true
+  bot_token: "" # 비워두면 환경변수 TG_BOT_TOKEN 사용
+  chat_id: "" # 비워두면 환경변수 TG_CHAT_ID 사용
+  timeout: 3 # HTTP 타임아웃(초)

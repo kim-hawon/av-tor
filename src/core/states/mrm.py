@@ -10,6 +10,7 @@ import time
 
 from core.states import STATE_END
 from hmi import led, buzzer, lcd, screens
+from iot import telegram_notify
 
 
 def run(context):
@@ -24,6 +25,7 @@ def run(context):
     buzzer.beep(on_time=0.2, off_time=0.15, count=3)
 
     print(f"[MRM] Emergency stop (reason: {reason} / {reason_code})")
+    telegram_notify.notify_mrm(context["scenario"], reason, reason_code)
     print("[MRM] Gradual deceleration simulation...")
     time.sleep(duration)
     buzzer.off()

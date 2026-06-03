@@ -1,6 +1,10 @@
 # 상태기계 / 설정 (필수)
 PyYAML>=6.0
 
+# 텔레그램 알림 (HANDOVER_OK / MRM 시점 메시지 전송)
+requests>=2.28
+python-dotenv>=1.0   # .env 파일에서 TG_BOT_TOKEN/TG_CHAT_ID 자동 로드
+
 # 음성/오디오 (스피커 재생, 음성 raw 녹음, STT)
 #   없어도 SIM 모드로 동작하지만, 실제 재생/녹음하려면 필요
 sounddevice>=0.4.6

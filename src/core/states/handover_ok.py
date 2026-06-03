@@ -7,6 +7,7 @@ import time
 
 from core.states import STATE_END
 from hmi import led, lcd, screens
+from iot import telegram_notify
 
 
 def run(context):
@@ -16,6 +17,8 @@ def run(context):
     led.green_on()
     lcd.show(*screens.handover_ok())
     print(f"[HANDOVER_OK] Takeover successful! → MANUAL MODE (displaying for {duration}s)")
+
+    telegram_notify.notify_handover_ok(context["scenario"])
 
     time.sleep(duration)
     print("[HANDOVER_OK] Scenario complete")
