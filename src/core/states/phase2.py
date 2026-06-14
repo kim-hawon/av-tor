@@ -27,26 +27,44 @@
 #     # TODO: 구현
 #     pass
 
+import time
 from vosk import Model, KaldiRecognizer
 import sounddevice as sd
 import soundfile as sf
 import json
 from core.readback import verify
 
-def run(scenario: dict, voice_cfg: dict) -> bool:
+def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0) -> bool:
+    """시나리오 TTS 재생 후 운전자 리드백을 STT 로 검증.
+
+    정답을 인식하면 True. 정답 인식 없이 timeout(초)이 지나면 False 를 반환해
+    상위 상태기계가 MRM 으로 보내도록 한다(무한 대기 방지).
+    """
     audio_data, sr = sf.read(scenario["audio"])
 
     rec = KaldiRecognizer(Model(voice_cfg["model_path"]), 16000)
     rec.SetWords(True)
     rec.SetGrammar(json.dumps(voice_cfg["vocab"], ensure_ascii=False))
 
-    print("Sys: Say something...")
+    print(f"Sys: Say something... (listening up to {timeout:.0f}s)")
 
     with sd.RawInputStream(samplerate=16000, blocksize=voice_cfg["blocksize"],
                            dtype='int16', channels=1) as stream:
         sd.play(audio_data, sr)
         sd.wait()
+        # TTS 안내가 끝난 시점부터 리드백 대기 한도를 잰다.
+        deadline = time.monotonic() + timeout
         while True:
+            if time.monotonic() >= deadline:
+                # 마지막으로 누적된 부분 인식 결과도 한 번 확인
+                final_text = json.loads(rec.FinalResult())["text"]
+                if final_text and verify(scenario["answer"], final_text):
+                    print(final_text)
+                    print("Sys: TOR success")
+                    return True
+                print("\nSys: Voice readback timeout")
+                return False
+
             data, _ = stream.read(1000)
             if rec.AcceptWaveform(bytes(data)):
                 text = json.loads(rec.Result())["text"]

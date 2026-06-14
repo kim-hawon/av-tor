@@ -52,8 +52,10 @@ class StateMachine:
                   f"(expected: '{scenario['answer']}')")
         elif dummy.get("use_real_voice", False):
             from core.states.phase2 import run as phase2_run  # 지연 import
-            print(f"[PHASE2] Starting real STT (expected: '{scenario['answer']}')")
-            ok = phase2_run(scenario, cfg["voice"])
+            listen_timeout = float(cfg.get("timing", {}).get("voice_listen", 12))
+            print(f"[PHASE2] Starting real STT (expected: '{scenario['answer']}', "
+                  f"timeout {listen_timeout:.0f}s)")
+            ok = phase2_run(scenario, cfg["voice"], timeout=listen_timeout)
         else:
             speaker.play(scenario["audio"])
             ok = False
