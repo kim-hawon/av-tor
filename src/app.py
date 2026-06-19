@@ -27,7 +27,7 @@ except ImportError:
 from core.scenario import load_config
 from core.state_machine import StateMachine
 from monitoring import grip
-from iot import telegram_notify
+from iot import telegram_notify, telegram_bot, telemetry
 import hmi
 
 
@@ -81,9 +81,28 @@ def main():
     hmi.setup_all(config)
     grip.configure(config)
     telegram_notify.configure(config)
+    telemetry.init(config)
 
     sm = StateMachine(config)
     print_banner(scenarios, use_real_voice, hmi.gpio_setup.is_sim())
+    
+    # 텔레그램 봇 초기화 및 시작
+    try:
+        from dotenv import load_dotenv
+        import os
+        load_dotenv()
+        
+        tg_token = os.environ.get("TG_BOT_TOKEN")
+        tg_chat = os.environ.get("TG_CHAT_ID")
+        
+        if tg_token and tg_chat:
+            telegram_bot.configure(tg_token, tg_chat)
+            bot_thread = telegram_bot.start()
+            print("\n[APP] Telegram bot started (messaging enabled)")
+        else:
+            print("\n[APP] Telegram bot disabled (TG_BOT_TOKEN or TG_CHAT_ID not set)")
+    except Exception as e:
+        print(f"\n[APP] Warning: Telegram bot init failed: {e}")
 
     try:
         while True:
@@ -108,6 +127,7 @@ def main():
             sm.run(scenario, param)
             print()  # 시나리오 종료 후 빈 줄
     finally:
+        telegram_bot.stop()
         hmi.cleanup_all()
 
 

@@ -1,0 +1,178 @@
+"""TOR 시도 이벤트 텔레메트리 저장 및 조회."""
+import os
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
+
+
+_TELEMETRY_DIR = "./data/telemetry"
+_LOG_FILE = None
+
+
+def init(config=None):
+    """텔레메트리 디렉토리 초기화."""
+    global _LOG_FILE
+    telemetry_dir = (config or {}).get("capture", {}).get("out_dir", "./data/captures")
+    telemetry_dir = os.path.join(os.path.dirname(telemetry_dir), "telemetry")
+    
+    Path(telemetry_dir).mkdir(parents=True, exist_ok=True)
+    
+    # 오늘 날짜로 로그 파일 생성
+    today = datetime.now().strftime("%Y-%m-%d")
+    _LOG_FILE = os.path.join(telemetry_dir, f"tor_{today}.jsonl")
+    print(f"[TELEMETRY] Initialized: {_LOG_FILE}")
+
+
+def log_event(event_type: str, scenario: dict, status: str, **kwargs):
+    """TOR 이벤트 기록 (JSONL 형식).
+    
+    event_type: 'tor_start', 'phase1_complete', 'phase2_success', 'phase2_fail', 'tor_end'
+    status: 'success', 'fail', 'timeout', 'nogaze', 'nogrip', 'novoice'
+    """
+    if _LOG_FILE is None:
+        init()
+    
+    record = {
+        "timestamp": datetime.now().isoformat(),
+        "event": event_type,
+        "scenario_id": scenario.get("id"),
+        "scenario_label": scenario.get("label"),
+        "status": status,
+        **kwargs
+    }
+    
+    try:
+        with open(_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print(f"[TELEMETRY] Write error: {e}")
+
+
+def get_events(days: int = 1) -> list:
+    """최근 N일간의 모든 이벤트 조회.
+    
+    days: 1 (어제), 7 (지난 7일), 31 (지난 31일), 0 (전체)
+    """
+    if _LOG_FILE is None:
+        init()
+    
+    telemetry_dir = os.path.dirname(_LOG_FILE)
+    events = []
+    
+    # 조회 기간 계산
+    if days > 0:
+        cutoff_date = datetime.now() - timedelta(days=days)
+    else:
+        cutoff_date = None
+    
+    # 모든 텔레메트리 파일 읽기
+    for log_file in sorted(Path(telemetry_dir).glob("tor_*.jsonl")):
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    record = json.loads(line)
+                    ts = datetime.fromisoformat(record["timestamp"])
+                    
+                    if cutoff_date is None or ts >= cutoff_date:
+                        events.append(record)
+        except Exception as e:
+            print(f"[TELEMETRY] Read error {log_file}: {e}")
+    
+    return sorted(events, key=lambda x: x["timestamp"])
+
+
+def get_stats(days: int = 1) -> dict:
+    """시간대별 통계 계산.
+    
+    Returns:
+        {
+            'total': 총 시도 횟수,
+            'success': 성공,
+            'fail': 실패,
+            'success_rate': 성공률(%),
+            'by_scenario': {scenario_label: {total, success, fail}},
+            'fail_reasons': {reason: count},
+        }
+    """
+    events = get_events(days)
+    
+    stats = {
+        "total": 0,
+        "success": 0,
+        "fail": 0,
+        "success_rate": 0.0,
+        "by_scenario": {},
+        "fail_reasons": {},
+    }
+    
+    # TOR 시작(phase1 들어가기) 기준으로 카운트
+    tor_starts = [e for e in events if e.get("event") == "tor_start"]
+    
+    if not tor_starts:
+        return stats
+    
+    stats["total"] = len(tor_starts)
+    
+    for event in tor_starts:
+        label = event.get("scenario_label", "Unknown")
+        
+        # 같은 TOR 세션의 결과 찾기
+        session_id = event.get("session_id")
+        if not session_id:
+            continue
+        
+        result = next(
+            (e for e in events 
+             if e.get("session_id") == session_id and e.get("event") == "tor_end"),
+            None
+        )
+        
+        if result:
+            status = result.get("status", "unknown")
+            if status == "success":
+                stats["success"] += 1
+            else:
+                stats["fail"] += 1
+                reason = result.get("fail_reason", "Unknown")
+                stats["fail_reasons"][reason] = stats["fail_reasons"].get(reason, 0) + 1
+        
+        # 시나리오별 통계
+        if label not in stats["by_scenario"]:
+            stats["by_scenario"][label] = {"total": 0, "success": 0, "fail": 0}
+        
+        stats["by_scenario"][label]["total"] += 1
+        if result and result.get("status") == "success":
+            stats["by_scenario"][label]["success"] += 1
+        else:
+            stats["by_scenario"][label]["fail"] += 1
+    
+    # 성공률 계산
+    if stats["total"] > 0:
+        stats["success_rate"] = round(100 * stats["success"] / stats["total"], 1)
+    
+    return stats
+
+
+if __name__ == "__main__":
+    import sys
+    
+    init()
+    
+    if len(sys.argv) > 1:
+        days = int(sys.argv[1])
+    else:
+        days = 7
+    
+    print(f"\n[TELEMETRY] Events (last {days} days):")
+    events = get_events(days)
+    for e in events:
+        print(f"  {e['timestamp']} | {e['event']:20} | {e.get('scenario_label', '?'):15} | {e.get('status')}")
+    
+    print(f"\n[TELEMETRY] Statistics (last {days} days):")
+    stats = get_stats(days)
+    print(f"  Total: {stats['total']}, Success: {stats['success']}, Fail: {stats['fail']}")
+    print(f"  Success Rate: {stats['success_rate']}%")
+    print(f"  Fail Reasons: {stats['fail_reasons']}")
+    print(f"  By Scenario: {stats['by_scenario']}")

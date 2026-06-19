@@ -9,6 +9,8 @@ from core.states import (
     STATE_HANDOVER_OK, STATE_MRM, STATE_END,
 )
 from hmi import lcd, speaker, screens
+from iot import telemetry
+import uuid
 
 
 class StateMachine:
@@ -79,13 +81,27 @@ class StateMachine:
         if param is None:
             param = scenario.get("param", {}).get("default", 0)
 
+        # 이 TOR 세션의 고유 ID
+        session_id = str(uuid.uuid4())[:8]
+
         context = {
             "scenario": scenario,
             "config": self.config,
             "param": param,       # LCD 경고문에 표시할 수치
+            "session_id": session_id,
             "fail_reason": None,  # MRM 진입 시 사유(한글)
             "fail_code": None,    # MRM LCD 표시용 코드(NoGrip 등)
         }
+
+        # TOR 시작 기록
+        telemetry.log_event(
+            "tor_start",
+            scenario,
+            "started",
+            session_id=session_id,
+            param=param
+        )
+        print(f"[TOR] Session {session_id} started")
 
         current_state = STATE_IDLE
         while current_state != STATE_END:
@@ -94,3 +110,15 @@ class StateMachine:
                 print(f"[ERROR] Unknown state: {current_state}")
                 break
             current_state = handler(context)
+
+        # TOR 종료 기록
+        final_status = "success" if context.get("fail_code") is None else "fail"
+        telemetry.log_event(
+            "tor_end",
+            scenario,
+            final_status,
+            session_id=session_id,
+            fail_code=context.get("fail_code"),
+            fail_reason=context.get("fail_reason")
+        )
+        print(f"[TOR] Session {session_id} ended: {final_status}")
