@@ -15,8 +15,8 @@ AV-TOR 텔레그램 봇을 통해 다음을 할 수 있습니다:
 `.env` 파일에 다음이 설정되어 있는지 확인하세요:
 
 ```
-TG_BOT_TOKEN=8712922597:AAGqMS-L70sriTmdQwMmoxMFnwyYCzYpduY
-TG_CHAT_ID=8794149474
+TG_BOT_TOKEN=<your-telegram-bot-token>
+TG_CHAT_ID=<your-telegram-chat-id>
 ```
 
 ### 2️⃣ 봇 시작 (2가지 방법)
