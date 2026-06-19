@@ -34,6 +34,7 @@ import soundfile as sf
 import numpy as np
 import json
 from core.readback import verify
+from hmi import speaker
 
 
 def _pick_input_samplerate() -> int:
@@ -94,6 +95,7 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0) -> bool:
                 if final_text and verify(scenario["answer"], final_text):
                     print(final_text)
                     print("Sys: TOR success")
+                    speaker.play("./audio/const.wav")
                     return True
                 print("\nSys: Voice readback timeout")
                 return False
@@ -104,6 +106,7 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0) -> bool:
                 print(text)
                 if verify(scenario["answer"], text):
                     print("Sys: TOR success")
+                    speaker.play("./audio/const.wav")
                     return True
             else:
                 partial = json.loads(rec.PartialResult())["partial"]
