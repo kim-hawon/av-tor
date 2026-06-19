@@ -38,10 +38,10 @@ class StateMachine:
         dummy = cfg.get("dummy", {})
         scenario = context["scenario"]
 
-        # 경고 OFF(PHASE1 에서 처리됨), LCD 를 동작 지시 화면으로 전환
-        action = scenario["lcd"]["phase2"]               # 예: "Lane 1 GO"
+        # 경고 OFF(PHASE1 에서 처리됨)
+        # phase2.run() 내부에서 LCD 시간 실시간 업데이트하므로 여기서는 표시 안 함
         speak_sec = round(speaker.duration(scenario["audio"])) or 7
-        lcd.show(*screens.phase2(action, speak_sec))
+        action = scenario["lcd"]["phase2"]  # 예: "Lane 1 GO"
         print(f"[PHASE2] Action: {action} (TTS guidance {speak_sec}s)")
 
         voice_ok_flag = bool(dummy.get("voice_ok", True))

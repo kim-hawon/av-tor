@@ -110,7 +110,7 @@ def run(context):
             grip_str = "OK" if grip_ok else " X"
             print(f"[PHASE1] {remaining}s | gaze=[{gaze_str}] grip=[{grip_str}]")
 
-            # HMI 출력
+            # HMI 출력 (4줄 화면)
             lcd.show(*screens.phase1(warn_prefix, remaining, gaze_ok, grip_ok))
 
             # 둘 다 충족 → PHASE2 (잠금/펄스 없이 즉시 이탈)
