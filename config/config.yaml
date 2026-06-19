@@ -3,13 +3,8 @@ voice:
   samplerate: 16000
   blocksize: 4000
   vocab:
-    - drive
-    - in
     - lane
     - one
-    - slow
-    - down
-    - to
     - sixty
     - four
     - forty
@@ -26,7 +21,7 @@ scenarios:
     key: const
     label: "Construction Zone"
     audio: "./audio/const.wav"
-    answer: "drive in lane one"
+    answer: "lane one"
     param: { default: 400, unit: m }
     lcd:
       phase1: "WARN:{v}m"
@@ -35,7 +30,7 @@ scenarios:
     key: rain
     label: "Rain"
     audio: "./audio/rain.wav"
-    answer: "slow down to sixty four"
+    answer: "sixty four"
     param: { default: 20, unit: mmh }
     lcd:
       phase1: "RAIN {v}mmh"
@@ -44,7 +39,7 @@ scenarios:
     key: fog
     label: "Fog"
     audio: "./audio/fog.wav"
-    answer: "slow down to forty"
+    answer: "fourty"
     param: { default: 30, unit: m }
     lcd:
       phase1: "FOG vis{v}m"
@@ -53,7 +48,7 @@ scenarios:
     key: icy
     label: "Icy Road"
     audio: "./audio/ice.wav"
-    answer: "slow down to forty"
+    answer: "fourty"
     param: { default: -5, unit: C }
     lcd:
       phase1: "ICY {v}C"
