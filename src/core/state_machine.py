@@ -55,9 +55,18 @@ class StateMachine:
         elif dummy.get("use_real_voice", False):
             from core.states.phase2 import run as phase2_run  # 지연 import
             listen_timeout = float(cfg.get("timing", {}).get("voice_listen", 12))
+            voice_extra = float(cfg.get("timing", {}).get("voice_extra", 3))
+            phase1_remaining = context.get("phase1_remaining")
+            if phase1_remaining is not None:
+                listen_timeout = min(listen_timeout, float(phase1_remaining))
             print(f"[PHASE2] Starting real STT (expected: '{scenario['answer']}', "
-                  f"timeout {listen_timeout:.0f}s)")
-            ok = phase2_run(scenario, cfg["voice"], timeout=listen_timeout)
+                  f"timeout {listen_timeout:.0f}s + {voice_extra:.0f}s grace)")
+            ok = phase2_run(
+                scenario,
+                cfg["voice"],
+                timeout=listen_timeout,
+                extra=voice_extra,
+            )
         else:
             speaker.play(scenario["audio"])
             ok = False

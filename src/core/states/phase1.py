@@ -116,6 +116,7 @@ def run(context):
             # 둘 다 충족 → PHASE2 (잠금/펄스 없이 즉시 이탈)
             if gaze_ok and grip_ok:
                 print("[PHASE1] Conditions met → entering PHASE2")
+                context["phase1_remaining"] = remaining
                 _warnings_off(red_off=True)
                 return STATE_PHASE2
 

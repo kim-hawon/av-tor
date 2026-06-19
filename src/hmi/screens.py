@@ -29,11 +29,14 @@ def phase1(warn_prefix: str, remaining: int, eye_ok: bool, grip_ok: bool):
     return line1, line2, line3, line4
 
 
-def phase2(action: str, speak_remaining: int):
-    """1행: 동작 지시(TTS 내용), 2행: 음성 안내 잔여초, 3~4행: 빈 줄."""
+def phase2(action: str, speak_remaining: int, extra_remaining: int = 0):
+    """1행: 동작 지시(TTS 내용), 2행: 음성 안내 잔여초, 3행: 추가 시간 안내, 4행: 빈 줄."""
     line1 = action
     line2 = f"Speak: {int(speak_remaining):02d}s"
-    line3 = ""
+    if extra_remaining > 0:
+        line3 = f"Extra: {int(extra_remaining):02d}s"
+    else:
+        line3 = ""
     line4 = ""
     return line1, line2, line3, line4
 
