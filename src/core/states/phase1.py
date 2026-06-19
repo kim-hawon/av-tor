@@ -61,7 +61,9 @@ def run(context):
     vibration.on()
 
     # Start real-time gaze monitor; fall back to dummy if camera is unavailable.
-    gaze_monitor = GazeMonitor(camera_index=None, show_preview=True)
+    # 헤드리스(모니터 없는 SSH) 라파에서는 show_preview=False — cv2.imshow 가
+    # 디스플레이를 못 찾아 PHASE1 이 죽는 걸 막는다. 시선 감지는 백그라운드라 화면 없이 동작.
+    gaze_monitor = GazeMonitor(camera_index=None, show_preview=False)
     use_real_gaze = gaze_monitor.start()
     if not use_real_gaze:
         print(f"[PHASE1] No camera — dummy gaze active (ok after {gaze_ok_after}s)")
