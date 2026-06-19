@@ -14,8 +14,15 @@ from datetime import datetime
 
 try:
     import requests
+    _HAS_REQUESTS = True
 except ImportError:
     requests = None
+    _HAS_REQUESTS = False
+
+# 모듈 로드 시 경고
+if not _HAS_REQUESTS:
+    print("[TELEGRAM] Warning: requests library not installed.")
+    print("           Install with: pip install requests")
 
 _API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
@@ -32,16 +39,32 @@ def configure(cfg):
     tg = (cfg or {}).get("telegram", {}) or {}
     _config["enabled"] = bool(tg.get("enabled", False))
     _config["bot_token"] = os.environ.get("TG_BOT_TOKEN") or tg.get("bot_token", "")
-    _config["chat_id"] = os.environ.get("TG_CHAT_ID") or str(tg.get("chat_id", ""))
+    _config["chat_id"] = os.environ.get("TG_CHAT_ID") or str(tg.get("chat_id", "")).strip()
     _config["timeout"] = float(tg.get("timeout", 3))
 
-    if _config["enabled"] and (not _config["bot_token"] or not _config["chat_id"]):
-        print("[TELEGRAM] enabled=true but bot_token/chat_id missing → notifications off")
-        _config["enabled"] = False
+    # 설정 상태 출력
+    print(f"[TELEGRAM] enabled={_config['enabled']}, requests={_HAS_REQUESTS}")
+    if _config["enabled"]:
+        if not _HAS_REQUESTS:
+            print("[TELEGRAM] ERROR: requests library not installed → notifications disabled")
+            _config["enabled"] = False
+        elif not _config["bot_token"]:
+            print("[TELEGRAM] ERROR: bot_token not set (env TG_BOT_TOKEN or config.yaml) → disabled")
+            _config["enabled"] = False
+        elif not _config["chat_id"]:
+            print("[TELEGRAM] ERROR: chat_id not set (env TG_CHAT_ID or config.yaml) → disabled")
+            _config["enabled"] = False
+        else:
+            print(f"[TELEGRAM] Configured: chat_id={_config['chat_id'][:10]}... (masked token)")
+            print("[TELEGRAM] Ready to send notifications")
 
 
 def _send_async(text):
-    if not _config["enabled"] or requests is None:
+    if not _config["enabled"]:
+        return
+    
+    if not _HAS_REQUESTS:
+        print("[TELEGRAM] Cannot send: requests not installed")
         return
 
     def _worker():
@@ -52,9 +75,13 @@ def _send_async(text):
             "parse_mode": "Markdown",
         }
         try:
-            requests.post(url, json=payload, timeout=_config["timeout"])
+            resp = requests.post(url, json=payload, timeout=_config["timeout"])
+            if resp.status_code == 200:
+                print("[TELEGRAM] Message sent successfully")
+            else:
+                print(f"[TELEGRAM] API error: {resp.status_code} - {resp.text}")
         except Exception as e:
-            print(f"[TELEGRAM] send failed: {e}")
+            print(f"[TELEGRAM] Send failed: {type(e).__name__}: {e}")
 
     threading.Thread(target=_worker, daemon=True).start()
 
@@ -86,3 +113,17 @@ def notify_mrm(scenario, reason, reason_code):
         "- 상태: EMERGENCY STOP"
     )
     _send_async(text)
+
+
+def test_send():
+    """테스트 메시지 전송 (디버깅용)."""
+    if not _config["enabled"]:
+        print("[TELEGRAM] Cannot test: notifications disabled")
+        print(f"  enabled={_config['enabled']}, has_requests={_HAS_REQUESTS}")
+        print(f"  token={'✓' if _config['bot_token'] else '✗'}, chat_id={'✓' if _config['chat_id'] else '✗'}")
+        return
+    
+    print("[TELEGRAM] Sending test message...")
+    text = f"*[AV-TOR] Test Message*\n- Time: {_ts()}\n- Status: Connection OK"
+    _send_async(text)
+    print("[TELEGRAM] Test message queued (check in 1-2 seconds)")
