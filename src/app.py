@@ -80,22 +80,26 @@ def main():
 
     # HMI/센서 초기화 (라파=실제, 그 외=SIM 자동 폴백)
     hmi.setup_all(config)
-    # 오디오 입출력 장치 고정 (TTS 출력=USB 스피커, 마이크 입력=USB 마이크)
-    from hmi import speaker
-    speaker.configure_devices(config)
-    grip.configure(config)
-    telegram_notify.configure(config)
-    telemetry.init(config)
 
     # 시선 카메라 + dlib 모델은 프로그램 시작 시 딱 한 번만 초기화한다.
     # (예전엔 매 시나리오마다 PHASE1 진입 시 카메라를 새로 열어 수 초간 "로딩"
     #  공백이 생겼다 — 이제 한 번 열어두고 모든 TOR 세션이 공유한다.)
+    # 중요: 오디오 장치 초기화(PortAudio/sd.query_devices)보다 "먼저" 카메라를 연다.
+    #       카메라도 USB라, 오디오 프로브가 USB 버스를 휘저은 직후엔 camera open 이
+    #       간헐 실패할 수 있다 → 깨끗한 상태에서 카메라부터 잡는다.
     gaze_monitor = GazeMonitor(camera_index=None, show_preview=False)
     use_real_gaze = gaze_monitor.start()
     if use_real_gaze:
         print("[APP] Gaze camera initialized once (shared across sessions)")
     else:
         print("[APP] No gaze camera — PHASE1 will use dummy gaze timing")
+
+    # 카메라를 잡은 뒤 오디오 입출력 장치 고정 (TTS 출력=USB 스피커, 마이크 입력=USB 마이크)
+    from hmi import speaker
+    speaker.configure_devices(config)
+    grip.configure(config)
+    telegram_notify.configure(config)
+    telemetry.init(config)
 
     sm = StateMachine(config, gaze_monitor=gaze_monitor, use_real_gaze=use_real_gaze)
     print_banner(scenarios, use_real_voice, hmi.gpio_setup.is_sim())
