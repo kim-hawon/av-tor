@@ -157,7 +157,7 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
     # 세션 동안 인식된 모든 최종 텍스트를 누적한다. "lane" 과 "one" 을 끊어
     # 말해 별도 발화로 잡혀도, 누적본("lane one")에서 키워드를 찾을 수 있다.
     # chunks: list[str] = []
-    # transcript = ""
+    transcript = ""
 
     try:
         while True:
