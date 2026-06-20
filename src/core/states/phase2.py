@@ -48,6 +48,11 @@ def _pick_input_samplerate() -> int:
         return 48000
 
 
+def _clean(text: str) -> str:
+    """인식 텍스트에서 [unk](미등록어 토큰)를 빼고 공백을 정리한다."""
+    return " ".join(t for t in text.split() if t != "[unk]")
+
+
 def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3.0) -> bool:
     """시나리오 TTS 재생 후 운전자 리드백을 STT 로 검증.
 
@@ -121,7 +126,7 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
             
             if now > extra_deadline:
                 # 남은 인식 버퍼를 비우고 누적본에 키워드가 있는지 마지막 확인
-                final_text = json.loads(rec.FinalResult())["text"]
+                final_text = _clean(json.loads(rec.FinalResult())["text"])
                 transcript = f"{transcript} {final_text}".strip()
                 if verify(scenario["answer"], transcript):
                     print(f"\nHeard: {transcript}")
@@ -133,7 +138,7 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
             data, _ = stream.read(1000)
             if rec.AcceptWaveform(bytes(data)):
                 # 한 발화 종료 → 최종 텍스트를 누적본에 더하고 키워드 검사
-                text = json.loads(rec.Result())["text"]
+                text = _clean(json.loads(rec.Result())["text"])
                 if text:
                     transcript = f"{transcript} {text}".strip()
                     print(f"Heard: {text}  (so far: {transcript})")
@@ -142,7 +147,7 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
                     return True
             else:
                 # 발화 중 부분결과 — 누적본 + 현재 부분에도 키워드가 보이면 즉시 성공
-                partial = json.loads(rec.PartialResult())["partial"]
+                partial = _clean(json.loads(rec.PartialResult())["partial"])
                 if partial:
                     print(f"  ({partial})", end='\r')
                     if verify(scenario["answer"], f"{transcript} {partial}".strip()):
