@@ -22,6 +22,30 @@ def init(config=None):
     _LOG_FILE = os.path.join(telemetry_dir, f"tor_{today}.jsonl")
     print(f"[TELEMETRY] Initialized: {_LOG_FILE}")
 
+    # 30일보다 오래된 기록은 정리(디스크 무한 증가 방지, 대시보드 최대 조회와 일치)
+    _cleanup_old(telemetry_dir, keep_days=30)
+
+
+def _cleanup_old(telemetry_dir: str, keep_days: int = 30):
+    """keep_days 보다 오래된 tor_YYYY-MM-DD.jsonl 파일을 삭제한다.
+
+    하루당 파일 1개라, 항상 최근 keep_days 일치(≈ keep_days 개 파일)만 남는다.
+    파일명이 날짜 형식이 아니면 건드리지 않는다.
+    """
+    cutoff = datetime.now().date() - timedelta(days=keep_days)
+    for log_file in Path(telemetry_dir).glob("tor_*.jsonl"):
+        try:
+            date_str = log_file.stem.replace("tor_", "")   # "YYYY-MM-DD"
+            file_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            continue  # 예상치 못한 파일명은 건너뜀
+        if file_date < cutoff:
+            try:
+                log_file.unlink()
+                print(f"[TELEMETRY] Removed old log (>{keep_days}d): {log_file.name}")
+            except OSError as e:
+                print(f"[TELEMETRY] Could not remove {log_file.name}: {e}")
+
 
 def log_event(event_type: str, scenario: dict, status: str, **kwargs):
     """TOR 이벤트 기록 (JSONL 형식).

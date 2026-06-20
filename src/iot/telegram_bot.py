@@ -9,6 +9,7 @@
 실행: python -m iot.telegram_bot
 """
 import os
+import re
 import threading
 import time
 from datetime import datetime
@@ -49,15 +50,12 @@ def _send_message(chat_id: str, text: str, parse_mode: str = "Markdown") -> bool
     
     try:
         url = _get_api_url("sendMessage")
-        resp = requests.post(
-            url,
-            json={
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": parse_mode,
-            },
-            timeout=5
-        )
+        payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+        resp = requests.post(url, json=payload, timeout=5)
+        if resp.status_code != 200 and parse_mode:
+            # Markdown 파싱 실패 가능 → 평문으로 재전송
+            payload.pop("parse_mode", None)
+            resp = requests.post(url, json=payload, timeout=5)
         return resp.status_code == 200
     except Exception as e:
         print(f"[TELEGRAM_BOT] Send error: {e}")
@@ -184,35 +182,27 @@ def _process_message(message: dict):
     try:
         chat_id = str(message["chat"]["id"])
         text = message.get("text", "").lower().strip()
-        
+
         print(f"[TELEGRAM_BOT] Message from {chat_id}: {text}")
-        
-        # 명령어 감지
-        if text in ["/dashboard", "대시보드", "dashboard"]:
-            _send_message(chat_id, "📊 대시보드를 조회하는 중...")
-            _handle_dashboard_request(chat_id, days=7)
-        
-        elif text in ["/dashboard_1d", "어제", "24시간"]:
-            _send_message(chat_id, "📊 어제 통계를 조회하는 중...")
-            _handle_dashboard_request(chat_id, days=1)
-        
-        elif text in ["/dashboard_31d", "지난달", "31일"]:
-            _send_message(chat_id, "📊 지난 31일 통계를 조회하는 중...")
-            _handle_dashboard_request(chat_id, days=31)
-        
+
+        # 대시보드: /dashboard=1일, /dashboard3=3일, /dashboard7=7일, /dashboard30=30일
+        #   (숫자를 안 붙이면 1일. '대시보드'/'dashboard' 도 1일.)
+        if text.startswith("/dashboard") or text in ["대시보드", "dashboard"]:
+            m = re.search(r"(\d+)", text)
+            days = int(m.group(1)) if m else 1
+            days = max(1, min(days, 30))  # 1~30일만 (보관 한도와 일치)
+            _send_message(chat_id, f"📊 최근 {days}일 통계를 조회하는 중...")
+            _handle_dashboard_request(chat_id, days=days)
+
         elif text in ["/help", "도움말", "help"]:
             help_text = (
                 "*🤖 AV-TOR 봇 명령어*\n"
                 "\n"
-                "*대시보드 조회:*\n"
-                "  /dashboard - 최근 7일 통계\n"
-                "  /dashboard_1d - 어제 통계\n"
-                "  /dashboard_31d - 지난 31일 통계\n"
-                "\n"
-                "*또는:*\n"
-                "  '대시보드' - 7일 통계\n"
-                "  '어제' - 어제 통계\n"
-                "  '지난달' - 31일 통계\n"
+                "*대시보드 조회 (기간별):*\n"
+                "  /dashboard - 최근 1일 통계\n"
+                "  /dashboard3 - 최근 3일\n"
+                "  /dashboard7 - 최근 7일\n"
+                "  /dashboard30 - 최근 30일\n"
                 "\n"
                 "/help - 이 도움말"
             )
