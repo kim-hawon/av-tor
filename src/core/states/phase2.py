@@ -156,8 +156,8 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
 
     # 세션 동안 인식된 모든 최종 텍스트를 누적한다. "lane" 과 "one" 을 끊어
     # 말해 별도 발화로 잡혀도, 누적본("lane one")에서 키워드를 찾을 수 있다.
-    chunks: list[str] = []
-    transcript = ""
+    # chunks: list[str] = []
+    # transcript = ""
 
     try:
         while True:
@@ -192,23 +192,18 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
 
             data, _ = stream.read(1000)
             if rec.AcceptWaveform(bytes(data)):
-                # 한 발화 종료 → 최종 텍스트를 누적본에 더하고 키워드 검사
+                # 한 발화 종료 → final result는 무시하고 partial 기반으로만 처리
                 text = _clean(json.loads(rec.Result())["text"])
                 if text:
-                    chunks.append(text)
-                    transcript = _combined_text(chunks)
-                    print(f"Heard: {text}  (so far: {transcript})")
-                if verify(scenario["answer"], transcript):
-                    print("Sys: TOR success")
-                    return True
+                    print(f"Heard: {text}  (ignored for chunk logic)")
+                # partial-only 모드이므로 here we do not update chunks/transcript
             else:
-                # 발화 중 부분결과 — 누적본 + 현재 partial을 함께 비교
+                # 발화 중 부분결과 — partial 텍스트만 실시간 비교
                 partial = _clean(json.loads(rec.PartialResult()).get("partial", ""))
                 if partial:
-                    combined = _combined_text(chunks, partial)
                     print(f"  ({partial})", end='\r')
-                    if verify(scenario["answer"], combined):
-                        print(f"\nHeard: {combined}")
+                    if verify(scenario["answer"], partial):
+                        print(f"\nHeard: {partial}")
                         print("Sys: TOR success")
                         return True
     finally:
