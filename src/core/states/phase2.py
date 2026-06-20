@@ -66,12 +66,13 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
     mic_sr = _pick_input_samplerate()
     print(f"[VOICE] Mic sample rate {mic_sr}Hz (recognizer at native rate, Vosk가 내부 변환)")
 
-    # 문법(SetGrammar)으로 단어를 묶지 않고 "자유 인식"한다. 운전자가 말한 문장을
-    # 통째로 받아, 그 안에 정답 키워드가 들어있는지로 판정한다(예: "lane one check"
-    # 라고 해도 'lane one' 을 잡는다). 단어를 묶으면 'lane one' 조합이 오히려 잘
-    # 안 합쳐졌다.
+    # 문법(SetGrammar)으로 인식 단어를 vocab 으로 제한한다. 작은 vosk-en 모델은
+    # 자유 인식 시 "lane one" 을 "i'm live on a" 처럼 엉뚱하게 듣는다. 단어를
+    # vocab(lane/one/...)으로 묶으면 그 단어만 후보라 정확히 잡힌다.
+    # "lane" 과 "one" 이 별도 발화로 쪼개지는 문제는 아래 transcript 누적이 해결한다.
     rec = KaldiRecognizer(Model(voice_cfg["model_path"]), float(mic_sr))
     rec.SetWords(True)
+    rec.SetGrammar(json.dumps(voice_cfg["vocab"], ensure_ascii=False))
 
     # TTS 안내음은 마이크를 열기 "전에" 끝까지 재생한다.
     # (예전엔 RawInputStream 을 연 채로 TTS 를 재생 → 입력/출력 장치 경합 +
