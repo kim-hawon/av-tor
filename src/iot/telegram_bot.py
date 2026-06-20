@@ -138,18 +138,19 @@ def _format_stats(stats: dict) -> str:
         f"*실패 원인:*"
     ]
     
-    if stats["fail_reasons"]:
-        for reason, count in sorted(stats["fail_reasons"].items(), key=lambda x: x[1], reverse=True):
-            lines.append(f"  • {reason}: {count}건")
-    else:
-        lines.append("  (없음)")
-    
-    if stats["by_scenario"]:
-        lines.append(f"")
-        lines.append(f"*시나리오별 통계:*")
-        for scenario, data in stats["by_scenario"].items():
-            success_rate = (data["success"] / data["total"] * 100) if data["total"] > 0 else 0
-            lines.append(f"  • {scenario}: {data['success']}/{data['total']} ({success_rate:.0f}%)")
+    # 4종 실패원인을 항상 표시 (많이 난 순). 0건도 노출.
+    for reason, count in sorted(stats["fail_reasons"].items(), key=lambda x: x[1], reverse=True):
+        lines.append(f"  • {reason}: {count}건")
+
+    # 4개 시나리오를 항상 표시. 시도 0건이면 (-) 로.
+    lines.append(f"")
+    lines.append(f"*시나리오별 통계:*")
+    for scenario, data in stats["by_scenario"].items():
+        if data["total"] > 0:
+            rate = data["success"] / data["total"] * 100
+            lines.append(f"  • {scenario}: {data['success']}/{data['total']} ({rate:.0f}%)")
+        else:
+            lines.append(f"  • {scenario}: 0/0 (-)")
     
     return "\n".join(lines)
 

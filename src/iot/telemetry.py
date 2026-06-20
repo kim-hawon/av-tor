@@ -8,6 +8,16 @@ from pathlib import Path
 _TELEMETRY_DIR = "./data/telemetry"
 _LOG_FILE = None
 
+# 대시보드에 0건이어도 "항상" 표시할 표준 목록 (config.yaml 시나리오 / 실패 코드와 일치).
+# 시나리오를 안 돌렸거나 특정 실패가 0건이어도 4개/4종을 모두 노출한다.
+ALL_SCENARIOS = ["Construction Zone", "Rain", "Fog", "Icy Road"]
+ALL_FAIL_LABELS = {
+    "NoEye": "전방 미주시(NoEye)",
+    "NoGrip": "핸들 미파지(NoGrip)",
+    "NoVoice": "음성확인 실패(NoVoice)",
+    "Timeout": "시간 초과(Timeout)",
+}
+
 
 def init(config=None):
     """텔레메트리 디렉토리 초기화."""
@@ -127,8 +137,11 @@ def get_stats(days: int = 1) -> dict:
         "success": 0,
         "fail": 0,
         "success_rate": 0.0,
-        "by_scenario": {},
-        "fail_reasons": {},
+        # 0건이어도 4개 시나리오 / 4종 실패원인을 항상 노출 (대시보드용)
+        "by_scenario": {
+            label: {"total": 0, "success": 0, "fail": 0} for label in ALL_SCENARIOS
+        },
+        "fail_reasons": {flabel: 0 for flabel in ALL_FAIL_LABELS.values()},
     }
     
     # TOR 시작(phase1 들어가기) 기준으로 카운트
@@ -159,8 +172,10 @@ def get_stats(days: int = 1) -> dict:
                 stats["success"] += 1
             else:
                 stats["fail"] += 1
-                reason = result.get("fail_reason", "Unknown")
-                stats["fail_reasons"][reason] = stats["fail_reasons"].get(reason, 0) + 1
+                # 안정적인 fail_code(NoEye/NoGrip/NoVoice/Timeout)로 집계해 친절한 라벨로
+                code = result.get("fail_code") or "Timeout"
+                flabel = ALL_FAIL_LABELS.get(code, code)
+                stats["fail_reasons"][flabel] = stats["fail_reasons"].get(flabel, 0) + 1
         
         # 시나리오별 통계
         if label not in stats["by_scenario"]:
