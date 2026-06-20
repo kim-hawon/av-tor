@@ -66,9 +66,12 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
     mic_sr = _pick_input_samplerate()
     print(f"[VOICE] Mic sample rate {mic_sr}Hz (recognizer at native rate, Vosk가 내부 변환)")
 
+    # 문법(SetGrammar)으로 단어를 묶지 않고 "자유 인식"한다. 운전자가 말한 문장을
+    # 통째로 받아, 그 안에 정답 키워드가 들어있는지로 판정한다(예: "lane one check"
+    # 라고 해도 'lane one' 을 잡는다). 단어를 묶으면 'lane one' 조합이 오히려 잘
+    # 안 합쳐졌다.
     rec = KaldiRecognizer(Model(voice_cfg["model_path"]), float(mic_sr))
     rec.SetWords(True)
-    rec.SetGrammar(json.dumps(voice_cfg["vocab"], ensure_ascii=False))
 
     # TTS 안내음은 마이크를 열기 "전에" 끝까지 재생한다.
     # (예전엔 RawInputStream 을 연 채로 TTS 를 재생 → 입력/출력 장치 경합 +
@@ -91,7 +94,11 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
         extra_deadline = deadline + extra
         last_lcd_update = start
         extra_notice_sent = False
-        
+
+        # 세션 동안 인식된 모든 최종 텍스트를 누적한다. "lane" 과 "one" 을 끊어
+        # 말해 별도 발화로 잡혀도, 누적본("lane one")에서 키워드를 찾을 수 있다.
+        transcript = ""
+
         while True:
             now = time.monotonic()
             elapsed = now - start
@@ -112,25 +119,35 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
                 last_lcd_update = now
             
             if now > extra_deadline:
-                # 마지막으로 누적된 부분 인식 결과도 한 번 확인
+                # 남은 인식 버퍼를 비우고 누적본에 키워드가 있는지 마지막 확인
                 final_text = json.loads(rec.FinalResult())["text"]
-                if final_text and verify(scenario["answer"], final_text):
-                    print(final_text)
+                transcript = f"{transcript} {final_text}".strip()
+                if verify(scenario["answer"], transcript):
+                    print(f"\nHeard: {transcript}")
                     print("Sys: TOR success")
                     speaker.play("./audio/const.wav")
                     return True
-                print("\nSys: Voice readback timeout")
+                print(f"\nHeard: '{transcript}' — Sys: Voice readback timeout")
                 return False
 
             data, _ = stream.read(1000)
             if rec.AcceptWaveform(bytes(data)):
+                # 한 발화 종료 → 최종 텍스트를 누적본에 더하고 키워드 검사
                 text = json.loads(rec.Result())["text"]
-                print(text)
-                if verify(scenario["answer"], text):
+                if text:
+                    transcript = f"{transcript} {text}".strip()
+                    print(f"Heard: {text}  (so far: {transcript})")
+                if verify(scenario["answer"], transcript):
                     print("Sys: TOR success")
                     speaker.play("./audio/const.wav")
                     return True
             else:
+                # 발화 중 부분결과 — 누적본 + 현재 부분에도 키워드가 보이면 즉시 성공
                 partial = json.loads(rec.PartialResult())["partial"]
                 if partial:
                     print(f"  ({partial})", end='\r')
+                    if verify(scenario["answer"], f"{transcript} {partial}".strip()):
+                        print(f"\nHeard: {transcript} {partial}".strip())
+                        print("Sys: TOR success")
+                        speaker.play("./audio/const.wav")
+                        return True
