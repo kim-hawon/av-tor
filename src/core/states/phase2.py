@@ -33,7 +33,7 @@ import sounddevice as sd
 import soundfile as sf
 import json
 from core.readback import verify
-from hmi import speaker, lcd, screens
+from hmi import lcd, screens
 
 
 def _pick_input_samplerate() -> int:
@@ -126,7 +126,6 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
                 if verify(scenario["answer"], transcript):
                     print(f"\nHeard: {transcript}")
                     print("Sys: TOR success")
-                    speaker.play("./audio/const.wav")
                     return True
                 print(f"\nHeard: '{transcript}' — Sys: Voice readback timeout")
                 return False
@@ -140,7 +139,6 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
                     print(f"Heard: {text}  (so far: {transcript})")
                 if verify(scenario["answer"], transcript):
                     print("Sys: TOR success")
-                    speaker.play("./audio/const.wav")
                     return True
             else:
                 # 발화 중 부분결과 — 누적본 + 현재 부분에도 키워드가 보이면 즉시 성공
@@ -150,5 +148,4 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
                     if verify(scenario["answer"], f"{transcript} {partial}".strip()):
                         print(f"\nHeard: {transcript} {partial}".strip())
                         print("Sys: TOR success")
-                        speaker.play("./audio/const.wav")
                         return True
