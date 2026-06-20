@@ -76,6 +76,7 @@ class GazeMonitor:
         self._green_since = None  # monotonic timestamp when green streak started
         self._running = False
         self._thread = None
+        self._cap = None             # start()에서 연 카메라 핸들 — 스레드가 그대로 재사용
         self._preview_frame = None   # latest annotated frame; displayed by main thread
         self._frame_lock = threading.Lock()
 
@@ -98,23 +99,38 @@ class GazeMonitor:
 
         import cv2
 
-        candidates = [self.camera_index] if self.camera_index is not None else [0, 1]
-        found_index = None
+        # 라파에서는 카메라 1대가 여러 /dev/video 노드를 만들고(일부는 캡처 불가),
+        # V4L2 첫 open 이 간헐적으로 실패한다. 그래서:
+        #   1) 후보 인덱스를 돌며
+        #   2) open 실패 시 잠깐 쉬고 재시도(최대 3회)하고
+        #   3) 실제로 프레임이 읽히는지(read 성공)까지 확인해 진짜 캡처 노드를 고른다.
+        # 핵심: 한 번 연 핸들은 release 하지 않고 그대로 스레드가 재사용한다
+        #       (열었다 닫고 바로 다시 여는 것이 바로 그 간헐 실패의 원인).
+        candidates = [self.camera_index] if self.camera_index is not None else [0, 1, 2]
+        cap = None
         for idx in candidates:
-            cap = cv2.VideoCapture(idx)
-            opened = cap.isOpened()
-            cap.release()
-            if opened:
-                found_index = idx
+            for attempt in range(3):
+                c = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+                if c.isOpened():
+                    c.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+                    c.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+                    ok, _ = c.read()  # 캡처 가능한 노드인지 실제 프레임으로 검증
+                    if ok:
+                        cap = c
+                        self.camera_index = idx
+                        break
+                c.release()
+                time.sleep(0.2)  # V4L2 워밍업 대기 후 재시도
+            if cap is not None:
                 break
 
-        if found_index is None:
+        if cap is None:
             print(
-                f"[GAZE] Camera not found (tried {candidates}) — no camera gaze detection"
+                f"[GAZE] Camera not found/readable (tried {candidates}) — no camera gaze detection"
             )
             return False
 
-        self.camera_index = found_index
+        self._cap = cap
         self.available = True
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -164,7 +180,8 @@ class GazeMonitor:
         detector = dlib.get_frontal_face_detector()
         predictor = dlib.shape_predictor(_DLIB_MODEL)
 
-        cap = cv2.VideoCapture(self.camera_index)
+        # start()에서 이미 열어 검증한 핸들을 그대로 사용(재open 금지 — 간헐 실패 방지).
+        cap = self._cap
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)   # Pi: 320x240이 4배 빠름
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 
