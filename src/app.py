@@ -80,6 +80,9 @@ def main():
 
     # HMI/센서 초기화 (라파=실제, 그 외=SIM 자동 폴백)
     hmi.setup_all(config)
+    # 오디오 입출력 장치 고정 (TTS 출력=USB 스피커, 마이크 입력=USB 마이크)
+    from hmi import speaker
+    speaker.configure_devices(config)
     grip.configure(config)
     telegram_notify.configure(config)
     telemetry.init(config)

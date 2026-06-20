@@ -1,3 +1,11 @@
+# 오디오 장치 고정 (USB 오디오가 여러 개라 기본 장치를 명시 지정)
+#   이름 부분일치(sd.query_devices 의 name 에 포함되면 매칭) 또는 정수 인덱스 사용.
+#   비워두면 시스템 기본 장치를 그대로 사용.
+#   현재 라파: 마이크=USB-Audio-1.0(hw:3,0), 스피커=USB PnP(hw:4,0)
+audio:
+  input_device: "USB-Audio"   # 마이크 (card 3)
+  output_device: "USB PnP"    # 스피커 (card 4)
+
 voice:
   model_path: "./models/vosk-en"
   samplerate: 16000
