@@ -57,6 +57,10 @@ def run(context):
 
     print(f"[PHASE1] TOR warning started ({scenario['label']}, {warn_prefix})")
     grip.configure(config)
+    stt_session = None
+    if config.get("dummy", {}).get("use_real_voice", False):
+        from core.states.phase2 import prepare as prepare_stt
+        stt_session = prepare_stt(config["voice"])
     vibration.on()
 
     # 입력 즉시 카운트다운 화면을 띄운다 — 카메라는 프로그램 시작 시 이미
@@ -120,6 +124,7 @@ def run(context):
             if gaze_ok and grip_ok:
                 # 남은 카운트다운 초를 PHASE2로 넘긴다 → 거기서 이어서 카운트다운(+3초 유예)
                 context["phase1_remaining"] = remaining
+                context["stt_session"] = stt_session
                 print(f"[PHASE1] Conditions met → entering PHASE2 "
                       f"(remaining {remaining}s carried over)")
                 _warnings_off(red_off=True)
@@ -161,6 +166,9 @@ def run(context):
         return STATE_MRM
 
     finally:
+        if stt_session is not None and context.get("phase1_remaining") is None:
+            from core.states.phase2 import cleanup_session as cleanup_stt_session
+            cleanup_stt_session(stt_session)
         if show_preview:
             cv2.destroyAllWindows()
             cv2.waitKey(1)

@@ -69,6 +69,7 @@ class StateMachine:
             ok = phase2_run(
                 scenario,
                 cfg["voice"],
+                stt_session=context.get("stt_session"),
                 timeout=listen_timeout,
                 extra=voice_extra,
             )

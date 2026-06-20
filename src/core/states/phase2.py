@@ -53,7 +53,57 @@ def _clean(text: str) -> str:
     return " ".join(t for t in text.split() if t != "[unk]")
 
 
-def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3.0) -> bool:
+class STTSession:
+    def __init__(self, model, rec, stream, mic_sr):
+        self.model = model
+        self.rec = rec
+        self.stream = stream
+        self.mic_sr = mic_sr
+
+    def close(self):
+        if self.stream is None:
+            return
+        try:
+            self.stream.stop()
+        except Exception:
+            pass
+        try:
+            self.stream.close()
+        except Exception:
+            pass
+        self.stream = None
+
+
+def prepare(voice_cfg: dict, warmup_blocks: int = 3, warmup_sleep: float = 0.05) -> STTSession:
+    """PHASE1에서 미리 Vosk 모델과 마이크 스트림을 준비한다."""
+    mic_sr = _pick_input_samplerate()
+    model = Model(voice_cfg["model_path"])
+    rec = KaldiRecognizer(model, float(mic_sr))
+    rec.SetWords(True)
+    rec.SetGrammar(json.dumps(voice_cfg["vocab"], ensure_ascii=False))
+
+    stream = sd.RawInputStream(
+        samplerate=mic_sr,
+        blocksize=voice_cfg["blocksize"],
+        dtype="int16",
+        channels=1,
+    )
+    stream.start()
+    for _ in range(warmup_blocks):
+        stream.read(1000)
+    time.sleep(warmup_sleep)
+
+    return STTSession(model, rec, stream, mic_sr)
+
+
+def cleanup_session(session: STTSession | None):
+    if session is None:
+        return
+    session.close()
+
+
+def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
+        timeout: float = 12.0, extra: float = 3.0) -> bool:
     """시나리오 TTS 재생 후 운전자 리드백을 STT 로 검증.
 
     정답을 인식하면 True. 정답 인식 없이 timeout(초)이 지나면 False 를 반환해
@@ -64,20 +114,16 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
     """
     audio_data, sr = sf.read(scenario["audio"])
 
-    # 마이크 네이티브 레이트로 캡처하고, 인식기도 "그 레이트로" 생성한다.
-    # (예전엔 16kHz 인식기 + 수동 선형보간 리샘플 → 'lane' 같은 단어가 뭉개져
-    #  'one' 만 잡혔다. Vosk 가 내부에서 고품질 리샘플하므로, 네이티브 레이트를
-    #  그대로 먹이는 게 가장 정확하다.)
-    mic_sr = _pick_input_samplerate()
-    print(f"[VOICE] Mic sample rate {mic_sr}Hz (recognizer at native rate, Vosk가 내부 변환)")
+    if stt_session is None:
+        stt_session = prepare(voice_cfg)
+        cleanup_after = True
+    else:
+        cleanup_after = True
 
-    # 문법(SetGrammar)으로 인식 단어를 vocab 으로 제한한다. 작은 vosk-en 모델은
-    # 자유 인식 시 "lane one" 을 "i'm live on a" 처럼 엉뚱하게 듣는다. 단어를
-    # vocab(lane/one/...)으로 묶으면 그 단어만 후보라 정확히 잡힌다.
-    # "lane" 과 "one" 이 별도 발화로 쪼개지는 문제는 아래 transcript 누적이 해결한다.
-    rec = KaldiRecognizer(Model(voice_cfg["model_path"]), float(mic_sr))
-    rec.SetWords(True)
-    rec.SetGrammar(json.dumps(voice_cfg["vocab"], ensure_ascii=False))
+    rec = stt_session.rec
+    mic_sr = stt_session.mic_sr
+    stream = stt_session.stream
+    print(f"[VOICE] Mic sample rate {mic_sr}Hz (recognizer at native rate, Vosk가 내부 변환)")
 
     # TTS 안내음은 마이크를 열기 "전에" 끝까지 재생한다.
     # (예전엔 RawInputStream 을 연 채로 TTS 를 재생 → 입력/출력 장치 경합 +
@@ -87,30 +133,25 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
 
     print(f"Sys: Say something... (listening up to {timeout:.0f}s + {extra:.0f}s grace)")
 
-    with sd.RawInputStream(samplerate=mic_sr, blocksize=voice_cfg["blocksize"],
-                           dtype='int16', channels=1) as stream:
-        # 첫 단어 인식 실패를 줄이기 위해 마이크 스트림을 예열하고 초기 버퍼를 비운다.
-        # 오디오 장치가 열리고 나서 바로 말하면 첫 프레임이 손실될 수 있다.
-        for _ in range(3):
-            stream.read(1000)
-        time.sleep(0.05)
+    stream = stt_session.stream
 
-        # 초기 LCD 표시 (음성 안내 화면)
-        action = scenario["lcd"]["phase2"]
-        speak_sec = round(timeout)
-        lcd.show(*screens.phase2(action, speak_sec, extra_remaining=0))
+    # 초기 LCD 표시 (음성 안내 화면)
+    action = scenario["lcd"]["phase2"]
+    speak_sec = round(timeout)
+    lcd.show(*screens.phase2(action, speak_sec, extra_remaining=0))
 
-        # 마이크를 연 시점(=TTS 종료 직후)부터 리드백 대기 한 시간을 잰다.
-        start = time.monotonic()
-        deadline = start + timeout
-        extra_deadline = deadline + extra
-        last_lcd_update = start
-        extra_notice_sent = False
+    # 마이크를 연 시점(=TTS 종료 직후)부터 리드백 대기 한 시간을 잰다.
+    start = time.monotonic()
+    deadline = start + timeout
+    extra_deadline = deadline + extra
+    last_lcd_update = start
+    extra_notice_sent = False
 
-        # 세션 동안 인식된 모든 최종 텍스트를 누적한다. "lane" 과 "one" 을 끊어
-        # 말해 별도 발화로 잡혀도, 누적본("lane one")에서 키워드를 찾을 수 있다.
-        transcript = ""
+    # 세션 동안 인식된 모든 최종 텍스트를 누적한다. "lane" 과 "one" 을 끊어
+    # 말해 별도 발화로 잡혀도, 누적본("lane one")에서 키워드를 찾을 수 있다.
+    transcript = ""
 
+    try:
         while True:
             now = time.monotonic()
             elapsed = now - start
@@ -123,13 +164,13 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
                 if not extra_notice_sent:
                     print("\nSys: Voice timeout reached, granting extra 3 seconds")
                     extra_notice_sent = True
-            
+
             # LCD 시간 업데이트 (0.5초 주기로, 깜빡임 방지)
             if now - last_lcd_update >= 0.5:
                 speak_remaining = int(remaining)
                 lcd.show(*screens.phase2(action, speak_remaining, extra_remaining=extra_remaining))
                 last_lcd_update = now
-            
+
             if now > extra_deadline:
                 # 남은 인식 버퍼를 비우고 누적본에 키워드가 있는지 마지막 확인
                 final_text = _clean(json.loads(rec.FinalResult())["text"])
@@ -160,3 +201,6 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
                         print(f"\nHeard: {transcript} {partial}".strip())
                         print("Sys: TOR success")
                         return True
+    finally:
+        if cleanup_after:
+            cleanup_session(stt_session)
