@@ -57,20 +57,21 @@ class StateMachine:
                   f"(expected: '{scenario['answer']}')")
         elif dummy.get("use_real_voice", False):
             from core.states.phase2 import run as phase2_run  # 지연 import
-            # PHASE1에서 남은 카운트다운 초를 이어받아 계속 카운트다운하고,
-            # 그 시간이 끝나면 voice_extra(기본 3초)를 추가로 더 준다.
-            # (carryover 정보가 없으면 voice_listen 기본값으로 폴백)
+            # PHASE1에서 남은 카운트다운 초를 이어받아(voice_listen 한도로 클램프) 계속
+            # 카운트다운하고, 그 시간이 끝나면 voice_extra(기본 3초)를 추가로 더 준다.
+            listen_timeout = float(cfg.get("timing", {}).get("voice_listen", 12))
             voice_extra = float(cfg.get("timing", {}).get("voice_extra", 3))
-            carried = context.get("phase1_remaining")
-            if carried is not None:
-                listen_timeout = float(carried) + voice_extra
-                print(f"[PHASE2] Carrying over {carried}s from PHASE1 "
-                      f"+ {voice_extra:.0f}s extra → listen {listen_timeout:.0f}s")
-            else:
-                listen_timeout = float(cfg.get("timing", {}).get("voice_listen", 12))
+            phase1_remaining = context.get("phase1_remaining")
+            if phase1_remaining is not None:
+                listen_timeout = min(listen_timeout, float(phase1_remaining))
             print(f"[PHASE2] Starting real STT (expected: '{scenario['answer']}', "
-                  f"timeout {listen_timeout:.0f}s)")
-            ok = phase2_run(scenario, cfg["voice"], timeout=listen_timeout)
+                  f"timeout {listen_timeout:.0f}s + {voice_extra:.0f}s grace)")
+            ok = phase2_run(
+                scenario,
+                cfg["voice"],
+                timeout=listen_timeout,
+                extra=voice_extra,
+            )
         else:
             speaker.play(scenario["audio"])
             ok = False

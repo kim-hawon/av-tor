@@ -64,12 +64,13 @@ def _resample_to_16k(pcm_bytes, src_sr: int) -> bytes:
     return np.interp(x_dst, x_src, audio.astype(np.float64)).astype(np.int16).tobytes()
 
 
-def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0) -> bool:
+def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3.0) -> bool:
     """시나리오 TTS 재생 후 운전자 리드백을 STT 로 검증.
 
     정답을 인식하면 True. 정답 인식 없이 timeout(초)이 지나면 False 를 반환해
     상위 상태기계가 MRM 으로 보내도록 한다(무한 대기 방지).
-    
+
+    timeout 종료 후 extra 초 만큼 추가 기회를 준다.
     실행 중 LCD에 남은 시간을 실시간으로 표시한다.
     """
     audio_data, sr = sf.read(scenario["audio"])
@@ -84,7 +85,7 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0) -> bool:
     sd.play(audio_data, sr)
     sd.wait()
 
-    print(f"Sys: Say something... (listening up to {timeout:.0f}s)")
+    print(f"Sys: Say something... (listening up to {timeout:.0f}s + {extra:.0f}s grace)")
 
     # 마이크 네이티브 레이트로 열고, 읽은 청크를 16kHz 로 변환해 Vosk 에 먹인다.
     mic_sr = _pick_input_samplerate()
@@ -95,25 +96,35 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0) -> bool:
         # 초기 LCD 표시 (음성 안내 화면)
         action = scenario["lcd"]["phase2"]
         speak_sec = round(timeout)
-        lcd.show(*screens.phase2(action, speak_sec))
+        lcd.show(*screens.phase2(action, speak_sec, extra_remaining=0))
 
         # 마이크를 연 시점(=TTS 종료 직후)부터 리드백 대기 한도를 잰다.
         start = time.monotonic()
         deadline = start + timeout
+        extra_deadline = deadline + extra
         last_lcd_update = start
+        extra_notice_sent = False
         
         while True:
             now = time.monotonic()
             elapsed = now - start
-            remaining = max(0, deadline - now)
+            if now <= deadline:
+                remaining = max(0, deadline - now)
+                extra_remaining = 0
+            else:
+                remaining = max(0, extra_deadline - now)
+                extra_remaining = int(remaining)
+                if not extra_notice_sent:
+                    print("\nSys: Voice timeout reached, granting extra 3 seconds")
+                    extra_notice_sent = True
             
             # LCD 시간 업데이트 (0.5초 주기로, 깜빡임 방지)
             if now - last_lcd_update >= 0.5:
                 speak_remaining = int(remaining)
-                lcd.show(*screens.phase2(action, speak_remaining))
+                lcd.show(*screens.phase2(action, speak_remaining, extra_remaining=extra_remaining))
                 last_lcd_update = now
             
-            if remaining <= 0:
+            if now > extra_deadline:
                 # 마지막으로 누적된 부분 인식 결과도 한 번 확인
                 final_text = json.loads(rec.FinalResult())["text"]
                 if final_text and verify(scenario["answer"], final_text):
