@@ -9,8 +9,12 @@ monitoring/voice.py가 인식한 STT 결과(raw)를 받아,
 def verify(answer: str, text: str) -> bool:
     """인식 텍스트가 시나리오 정답 토큰과 일치하면 True.
 
-    예: scenario.answer == "우회전 확인" 이고
-        recognized_text 안에 해당 토큰이 포함되면 성공.
+    예: scenario.answer == "lane one" 이고 인식 결과가 "lane one check" 처럼
+        정답 토큰을 포함하면 성공. 대소문자/앞뒤 공백 차이는 무시한다.
     """
-    return answer in text
+    if not answer or not text:
+        return False
+    norm_answer = " ".join(answer.lower().split())
+    norm_text = " ".join(text.lower().split())
+    return norm_answer in norm_text
 

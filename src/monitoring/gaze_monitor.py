@@ -143,6 +143,16 @@ class GazeMonitor:
                 return False
             return (time.monotonic() - self._green_since) >= required_duration
 
+    def reset(self):
+        """현재 green 연속 구간을 초기화한다.
+
+        프로그램 시작 시 한 번 start() 한 모니터를 여러 TOR 세션이 공유할 때,
+        새 세션마다 호출해 '직전 응시 상태'가 넘어오지 않고 다시 1초 응시를
+        요구하도록 만든다(카메라/스레드는 그대로 유지).
+        """
+        with self._lock:
+            self._green_since = None
+
     # ------------------------------------------------------------------
     # Background thread
     # ------------------------------------------------------------------

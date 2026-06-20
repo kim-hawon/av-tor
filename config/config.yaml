@@ -39,7 +39,7 @@ scenarios:
     key: fog
     label: "Fog"
     audio: "./audio/fog.wav"
-    answer: "fourty"
+    answer: "forty"
     param: { default: 30, unit: m }
     lcd:
       phase1: "FOG vis{v}m"
@@ -48,7 +48,7 @@ scenarios:
     key: icy
     label: "Icy Road"
     audio: "./audio/ice.wav"
-    answer: "fourty"
+    answer: "forty"
     param: { default: -5, unit: C }
     lcd:
       phase1: "ICY {v}C"

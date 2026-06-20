@@ -27,6 +27,7 @@ except ImportError:
 from core.scenario import load_config
 from core.state_machine import StateMachine
 from monitoring import grip
+from monitoring.gaze_monitor import GazeMonitor
 from iot import telegram_notify, telegram_bot, telemetry
 import hmi
 
@@ -83,7 +84,17 @@ def main():
     telegram_notify.configure(config)
     telemetry.init(config)
 
-    sm = StateMachine(config)
+    # 시선 카메라 + dlib 모델은 프로그램 시작 시 딱 한 번만 초기화한다.
+    # (예전엔 매 시나리오마다 PHASE1 진입 시 카메라를 새로 열어 수 초간 "로딩"
+    #  공백이 생겼다 — 이제 한 번 열어두고 모든 TOR 세션이 공유한다.)
+    gaze_monitor = GazeMonitor(camera_index=None, show_preview=False)
+    use_real_gaze = gaze_monitor.start()
+    if use_real_gaze:
+        print("[APP] Gaze camera initialized once (shared across sessions)")
+    else:
+        print("[APP] No gaze camera — PHASE1 will use dummy gaze timing")
+
+    sm = StateMachine(config, gaze_monitor=gaze_monitor, use_real_gaze=use_real_gaze)
     print_banner(scenarios, use_real_voice, hmi.gpio_setup.is_sim())
     
     # 텔레그램 봇 초기화 및 시작
@@ -127,6 +138,7 @@ def main():
             sm.run(scenario, param)
             print()  # 시나리오 종료 후 빈 줄
     finally:
+        gaze_monitor.stop()  # 공유 카메라/스레드 정리 (프로그램 종료 시 1회)
         telegram_bot.stop()
         hmi.cleanup_all()
 

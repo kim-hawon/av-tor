@@ -78,6 +78,12 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0) -> bool:
     rec.SetWords(True)
     rec.SetGrammar(json.dumps(voice_cfg["vocab"], ensure_ascii=False))
 
+    # TTS 안내음은 마이크를 열기 "전에" 끝까지 재생한다.
+    # (예전엔 RawInputStream 을 연 채로 TTS 를 재생 → 입력/출력 장치 경합 +
+    #  재생 동안 마이크 버퍼가 넘쳐, 정작 리드백 구간에서 인식이 안 됐다.)
+    sd.play(audio_data, sr)
+    sd.wait()
+
     print(f"Sys: Say something... (listening up to {timeout:.0f}s)")
 
     # 마이크 네이티브 레이트로 열고, 읽은 청크를 16kHz 로 변환해 Vosk 에 먹인다.
@@ -86,15 +92,12 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0) -> bool:
         print(f"[VOICE] Mic sample rate {mic_sr}Hz → resampling to 16000Hz")
     with sd.RawInputStream(samplerate=mic_sr, blocksize=voice_cfg["blocksize"],
                            dtype='int16', channels=1) as stream:
-        sd.play(audio_data, sr)
-        sd.wait()
-        
         # 초기 LCD 표시 (음성 안내 화면)
         action = scenario["lcd"]["phase2"]
         speak_sec = round(timeout)
         lcd.show(*screens.phase2(action, speak_sec))
-        
-        # TTS 안내가 끝난 시점부터 리드백 대기 한도를 잰다.
+
+        # 마이크를 연 시점(=TTS 종료 직후)부터 리드백 대기 한도를 잰다.
         start = time.monotonic()
         deadline = start + timeout
         last_lcd_update = start

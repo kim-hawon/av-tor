@@ -16,7 +16,6 @@ import time
 from core.states import STATE_PHASE2, STATE_MRM
 from hmi import led, buzzer, vibration, lcd, screens
 from monitoring import grip
-from monitoring.gaze_monitor import GazeMonitor
 
 
 def _alarm_pulse(remaining: int, urgent: int, critical: int):
@@ -60,12 +59,18 @@ def run(context):
     grip.configure(config)
     vibration.on()
 
-    # Start real-time gaze monitor; fall back to dummy if camera is unavailable.
-    # 헤드리스(모니터 없는 SSH) 라파에서는 show_preview=False — cv2.imshow 가
-    # 디스플레이를 못 찾아 PHASE1 이 죽는 걸 막는다. 시선 감지는 백그라운드라 화면 없이 동작.
-    gaze_monitor = GazeMonitor(camera_index=None, show_preview=False)
-    use_real_gaze = gaze_monitor.start()
-    if not use_real_gaze:
+    # 입력 즉시 카운트다운 화면을 띄운다 — 카메라는 프로그램 시작 시 이미
+    # 초기화돼 있으므로(아래 공유 모니터) "로딩" 공백 없이 바로 보인다.
+    lcd.show(*screens.phase1(warn_prefix, tor_budget, False, False))
+
+    # 시선 모니터는 app.py에서 프로그램 시작 시 1회 초기화해 context로 넘어온다.
+    # 매 세션 카메라를 새로 열지 않으므로 PHASE1 진입이 즉시 이뤄진다.
+    # 카메라가 없으면 use_real_gaze=False → 더미(gaze_ok_after) 사용.
+    gaze_monitor = context.get("gaze_monitor")
+    use_real_gaze = context.get("use_real_gaze", False) and gaze_monitor is not None
+    if use_real_gaze:
+        gaze_monitor.reset()  # 이번 세션은 새로 1초 응시를 요구(직전 상태 무시)
+    else:
         print(f"[PHASE1] No camera — dummy gaze active (ok after {gaze_ok_after}s)")
 
     # cv2 window must be driven from the main thread (Windows HighGUI constraint).
@@ -88,14 +93,12 @@ def run(context):
                 if use_real_gaze:
                     if gaze_monitor.is_gaze_ok(required_duration=1.0):
                         gaze_ok = True
-                        gaze_monitor.stop()
                         if show_preview:
                             cv2.destroyAllWindows()
                             cv2.waitKey(1)
                             show_preview = False
-                        print(
-                            "[PHASE1] Gaze OK (green detection for 1s) — camera closed"
-                        )
+                        # 공유 모니터는 멈추지 않는다(다음 세션 재사용)
+                        print("[PHASE1] Gaze OK (green detection for 1s)")
                 else:
                     if elapsed >= gaze_ok_after:
                         gaze_ok = True
@@ -115,7 +118,10 @@ def run(context):
 
             # 둘 다 충족 → PHASE2 (잠금/펄스 없이 즉시 이탈)
             if gaze_ok and grip_ok:
-                print("[PHASE1] Conditions met → entering PHASE2")
+                # 남은 카운트다운 초를 PHASE2로 넘긴다 → 거기서 이어서 카운트다운(+3초 유예)
+                context["phase1_remaining"] = remaining
+                print(f"[PHASE1] Conditions met → entering PHASE2 "
+                      f"(remaining {remaining}s carried over)")
                 _warnings_off(red_off=True)
                 return STATE_PHASE2
 
@@ -158,7 +164,7 @@ def run(context):
         if show_preview:
             cv2.destroyAllWindows()
             cv2.waitKey(1)
-        gaze_monitor.stop()
+        # 공유 GazeMonitor는 여기서 멈추지 않는다 — 프로그램 종료 시 app.py가 정리.
 
 
 def _warnings_off(red_off: bool):

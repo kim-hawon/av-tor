@@ -16,8 +16,11 @@ import uuid
 class StateMachine:
     """상태 기계 메인 클래스."""
 
-    def __init__(self, config):
+    def __init__(self, config, gaze_monitor=None, use_real_gaze=False):
         self.config = config
+        # 프로그램 시작 시 1회 초기화된 시선 모니터를 모든 세션이 공유한다.
+        self.gaze_monitor = gaze_monitor
+        self.use_real_gaze = use_real_gaze
         # 상태 이름 → 핸들러 매핑. PHASE2는 팀원 STT 어댑터.
         self.handlers = {
             STATE_IDLE: idle.run,
@@ -54,7 +57,17 @@ class StateMachine:
                   f"(expected: '{scenario['answer']}')")
         elif dummy.get("use_real_voice", False):
             from core.states.phase2 import run as phase2_run  # 지연 import
-            listen_timeout = float(cfg.get("timing", {}).get("voice_listen", 12))
+            # PHASE1에서 남은 카운트다운 초를 이어받아 계속 카운트다운하고,
+            # 그 시간이 끝나면 voice_extra(기본 3초)를 추가로 더 준다.
+            # (carryover 정보가 없으면 voice_listen 기본값으로 폴백)
+            voice_extra = float(cfg.get("timing", {}).get("voice_extra", 3))
+            carried = context.get("phase1_remaining")
+            if carried is not None:
+                listen_timeout = float(carried) + voice_extra
+                print(f"[PHASE2] Carrying over {carried}s from PHASE1 "
+                      f"+ {voice_extra:.0f}s extra → listen {listen_timeout:.0f}s")
+            else:
+                listen_timeout = float(cfg.get("timing", {}).get("voice_listen", 12))
             print(f"[PHASE2] Starting real STT (expected: '{scenario['answer']}', "
                   f"timeout {listen_timeout:.0f}s)")
             ok = phase2_run(scenario, cfg["voice"], timeout=listen_timeout)
@@ -91,6 +104,8 @@ class StateMachine:
             "session_id": session_id,
             "fail_reason": None,  # MRM 진입 시 사유(한글)
             "fail_code": None,    # MRM LCD 표시용 코드(NoGrip 등)
+            "gaze_monitor": self.gaze_monitor,    # 시작 시 1회 초기화된 공유 모니터
+            "use_real_gaze": self.use_real_gaze,  # 카메라 사용 가능 여부
         }
 
         # TOR 시작 기록
