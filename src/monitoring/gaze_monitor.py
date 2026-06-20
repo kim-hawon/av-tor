@@ -99,34 +99,46 @@ class GazeMonitor:
 
         import cv2
 
-        # 라파에서는 카메라 1대가 여러 /dev/video 노드를 만들고(일부는 캡처 불가),
-        # V4L2 첫 open 이 간헐적으로 실패한다. 그래서:
-        #   1) 후보 인덱스를 돌며
-        #   2) open 실패 시 잠깐 쉬고 재시도(최대 3회)하고
-        #   3) 실제로 프레임이 읽히는지(read 성공)까지 확인해 진짜 캡처 노드를 고른다.
-        # 핵심: 한 번 연 핸들은 release 하지 않고 그대로 스레드가 재사용한다
-        #       (열었다 닫고 바로 다시 여는 것이 바로 그 간헐 실패의 원인).
+        # 라파 USB 카메라는 open/read 가 근본적으로 간헐 실패한다(isOpened 가 False 였다가
+        # 잠시 뒤 True, open 직후 첫 프레임은 비어 옴 등). 그래서 끈질기게 재시도한다:
+        #   - 여러 "라운드"로 후보 인덱스를 반복 시도하고
+        #   - open 된 핸들은 첫 프레임이 들어올 때까지 여러 번 read 로 워밍업하고
+        #   - 진짜 프레임이 들어오는 노드만 채택(가짜 캡처 노드 거름).
+        # 핵심: 한 번 잡은 핸들은 release 하지 않고 스레드가 그대로 재사용한다
+        #       (열었다 닫고 바로 다시 여는 것이 간헐 실패를 키운다).
         candidates = [self.camera_index] if self.camera_index is not None else [0, 1, 2]
+        ROUNDS = 5            # 전체 후보 목록을 최대 5라운드 반복
+        WARMUP_READS = 10     # open 직후 첫 프레임 대기(각 0.1s)
         cap = None
-        for idx in candidates:
-            for attempt in range(3):
+        for round_no in range(1, ROUNDS + 1):
+            for idx in candidates:
                 c = cv2.VideoCapture(idx, cv2.CAP_V4L2)
-                if c.isOpened():
-                    c.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-                    c.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-                    ok, _ = c.read()  # 캡처 가능한 노드인지 실제 프레임으로 검증
-                    if ok:
-                        cap = c
-                        self.camera_index = idx
+                if not c.isOpened():
+                    c.release()
+                    continue
+                c.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+                c.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+                got = False
+                for _ in range(WARMUP_READS):
+                    ok, frame = c.read()
+                    if ok and frame is not None:
+                        got = True
                         break
+                    time.sleep(0.1)  # 첫 프레임 워밍업 대기
+                if got:
+                    cap = c
+                    self.camera_index = idx
+                    break
                 c.release()
-                time.sleep(0.2)  # V4L2 워밍업 대기 후 재시도
             if cap is not None:
                 break
+            print(f"[GAZE] camera open round {round_no}/{ROUNDS} failed — retrying...")
+            time.sleep(0.5)  # 라운드 간 백오프
 
         if cap is None:
             print(
-                f"[GAZE] Camera not found/readable (tried {candidates}) — no camera gaze detection"
+                f"[GAZE] Camera not found/readable (tried {candidates}, {ROUNDS} rounds) "
+                f"— no camera gaze detection"
             )
             return False
 
