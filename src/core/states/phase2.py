@@ -53,6 +53,13 @@ def _clean(text: str) -> str:
     return " ".join(t for t in text.split() if t != "[unk]")
 
 
+def _combined_text(chunks: list[str], partial: str | None = None) -> str:
+    parts = [chunk for chunk in chunks if chunk]
+    if partial:
+        parts.append(partial)
+    return " ".join(parts).strip()
+
+
 class STTSession:
     def __init__(self, model, rec, stream, mic_sr):
         self.model = model
@@ -149,6 +156,7 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
 
     # 세션 동안 인식된 모든 최종 텍스트를 누적한다. "lane" 과 "one" 을 끊어
     # 말해 별도 발화로 잡혀도, 누적본("lane one")에서 키워드를 찾을 수 있다.
+    chunks: list[str] = []
     transcript = ""
 
     try:
@@ -187,18 +195,20 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
                 # 한 발화 종료 → 최종 텍스트를 누적본에 더하고 키워드 검사
                 text = _clean(json.loads(rec.Result())["text"])
                 if text:
-                    transcript = f"{transcript} {text}".strip()
+                    chunks.append(text)
+                    transcript = _combined_text(chunks)
                     print(f"Heard: {text}  (so far: {transcript})")
                 if verify(scenario["answer"], transcript):
                     print("Sys: TOR success")
                     return True
             else:
-                # 발화 중 부분결과 — 누적본 + 현재 부분에도 키워드가 보이면 즉시 성공
-                partial = _clean(json.loads(rec.PartialResult())["partial"])
+                # 발화 중 부분결과 — 누적본 + 현재 partial을 함께 비교
+                partial = _clean(json.loads(rec.PartialResult()).get("partial", ""))
                 if partial:
+                    combined = _combined_text(chunks, partial)
                     print(f"  ({partial})", end='\r')
-                    if verify(scenario["answer"], f"{transcript} {partial}".strip()):
-                        print(f"\nHeard: {transcript} {partial}".strip())
+                    if verify(scenario["answer"], combined):
+                        print(f"\nHeard: {combined}")
                         print("Sys: TOR success")
                         return True
     finally:
