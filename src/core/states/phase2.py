@@ -31,7 +31,6 @@ import time
 from vosk import Model, KaldiRecognizer
 import sounddevice as sd
 import soundfile as sf
-import numpy as np
 import json
 from core.readback import verify
 from hmi import speaker, lcd, screens
@@ -49,21 +48,6 @@ def _pick_input_samplerate() -> int:
         return 48000
 
 
-def _resample_to_16k(pcm_bytes, src_sr: int) -> bytes:
-    """int16 mono PCM 을 src_sr → 16000Hz 로 선형보간 리샘플 (Vosk 입력용)."""
-    if src_sr == 16000:
-        return bytes(pcm_bytes)
-    audio = np.frombuffer(bytes(pcm_bytes), dtype=np.int16)
-    if audio.size == 0:
-        return b""
-    n_dst = int(round(audio.size * 16000 / src_sr))
-    if n_dst <= 0:
-        return b""
-    x_src = np.arange(audio.size)
-    x_dst = np.linspace(0, audio.size - 1, n_dst)
-    return np.interp(x_dst, x_src, audio.astype(np.float64)).astype(np.int16).tobytes()
-
-
 def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3.0) -> bool:
     """시나리오 TTS 재생 후 운전자 리드백을 STT 로 검증.
 
@@ -75,7 +59,14 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
     """
     audio_data, sr = sf.read(scenario["audio"])
 
-    rec = KaldiRecognizer(Model(voice_cfg["model_path"]), 16000)
+    # 마이크 네이티브 레이트로 캡처하고, 인식기도 "그 레이트로" 생성한다.
+    # (예전엔 16kHz 인식기 + 수동 선형보간 리샘플 → 'lane' 같은 단어가 뭉개져
+    #  'one' 만 잡혔다. Vosk 가 내부에서 고품질 리샘플하므로, 네이티브 레이트를
+    #  그대로 먹이는 게 가장 정확하다.)
+    mic_sr = _pick_input_samplerate()
+    print(f"[VOICE] Mic sample rate {mic_sr}Hz (recognizer at native rate, Vosk가 내부 변환)")
+
+    rec = KaldiRecognizer(Model(voice_cfg["model_path"]), float(mic_sr))
     rec.SetWords(True)
     rec.SetGrammar(json.dumps(voice_cfg["vocab"], ensure_ascii=False))
 
@@ -87,10 +78,6 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
 
     print(f"Sys: Say something... (listening up to {timeout:.0f}s + {extra:.0f}s grace)")
 
-    # 마이크 네이티브 레이트로 열고, 읽은 청크를 16kHz 로 변환해 Vosk 에 먹인다.
-    mic_sr = _pick_input_samplerate()
-    if mic_sr != 16000:
-        print(f"[VOICE] Mic sample rate {mic_sr}Hz → resampling to 16000Hz")
     with sd.RawInputStream(samplerate=mic_sr, blocksize=voice_cfg["blocksize"],
                            dtype='int16', channels=1) as stream:
         # 초기 LCD 표시 (음성 안내 화면)
@@ -136,7 +123,7 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
                 return False
 
             data, _ = stream.read(1000)
-            if rec.AcceptWaveform(_resample_to_16k(data, mic_sr)):
+            if rec.AcceptWaveform(bytes(data)):
                 text = json.loads(rec.Result())["text"]
                 print(text)
                 if verify(scenario["answer"], text):
