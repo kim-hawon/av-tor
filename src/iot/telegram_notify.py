@@ -69,13 +69,16 @@ def _send_async(text):
 
     def _worker():
         url = _API_URL.format(token=_config["bot_token"])
-        payload = {
-            "chat_id": _config["chat_id"],
-            "text": text,
-            "parse_mode": "Markdown",
-        }
+        base = {"chat_id": _config["chat_id"], "text": text}
         try:
-            resp = requests.post(url, json=payload, timeout=_config["timeout"])
+            resp = requests.post(
+                url, json={**base, "parse_mode": "Markdown"}, timeout=_config["timeout"]
+            )
+            if resp.status_code != 200:
+                # Markdown 파싱 실패(특수문자/대괄호 등) 가능 → 평문으로 재전송
+                print(f"[TELEGRAM] Markdown failed ({resp.status_code}): "
+                      f"{resp.text[:120]} → retry as plain text")
+                resp = requests.post(url, json=base, timeout=_config["timeout"])
             if resp.status_code == 200:
                 print("[TELEGRAM] Message sent successfully")
             else:
@@ -94,7 +97,7 @@ def notify_handover_ok(scenario):
     """제어권 전환 성공 알림."""
     label = scenario.get("label", "?")
     text = (
-        "*[AV-TOR] 제어권 전환 성공*\n"
+        "*🚗 AV-TOR 제어권 전환 성공*\n"
         f"- 시나리오: {label}\n"
         f"- 시각: {_ts()}\n"
         "- 상태: MANUAL MODE"
@@ -106,7 +109,7 @@ def notify_mrm(scenario, reason, reason_code):
     """제어권 전환 실패 → MRM 진입 알림."""
     label = scenario.get("label", "?")
     text = (
-        "*[AV-TOR] 제어권 전환 실패 (MRM)*\n"
+        "*🚨 AV-TOR 제어권 전환 실패 (MRM)*\n"
         f"- 시나리오: {label}\n"
         f"- 사유: {reason} ({reason_code})\n"
         f"- 시각: {_ts()}\n"
