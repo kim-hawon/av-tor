@@ -89,12 +89,18 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
 
     with sd.RawInputStream(samplerate=mic_sr, blocksize=voice_cfg["blocksize"],
                            dtype='int16', channels=1) as stream:
+        # 첫 단어 인식 실패를 줄이기 위해 마이크 스트림을 예열하고 초기 버퍼를 비운다.
+        # 오디오 장치가 열리고 나서 바로 말하면 첫 프레임이 손실될 수 있다.
+        for _ in range(3):
+            stream.read(1000)
+        time.sleep(0.05)
+
         # 초기 LCD 표시 (음성 안내 화면)
         action = scenario["lcd"]["phase2"]
         speak_sec = round(timeout)
         lcd.show(*screens.phase2(action, speak_sec, extra_remaining=0))
 
-        # 마이크를 연 시점(=TTS 종료 직후)부터 리드백 대기 한도를 잰다.
+        # 마이크를 연 시점(=TTS 종료 직후)부터 리드백 대기 한 시간을 잰다.
         start = time.monotonic()
         deadline = start + timeout
         extra_deadline = deadline + extra

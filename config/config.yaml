@@ -9,7 +9,7 @@ audio:
 voice:
   model_path: "./models/vosk-en"
   samplerate: 16000
-  blocksize: 4000
+  blocksize: 2000
   # [unk](미등록어 토큰)는 일부러 넣지 않는다. 넣으면 인식기가 애매한 음성을
   # 단어 대신 [unk]로 버려 'four'/'sixty' 가 자꾸 안 잡힌다. 빼면 들린 음성을
   # 아래 단어 중 가장 가까운 것으로 강제 매칭 → 키워드 인식률이 올라간다.
