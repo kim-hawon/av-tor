@@ -85,16 +85,23 @@ def run(scenario: dict, voice_cfg: dict, timeout: float = 12.0, extra: float = 3
     sd.play(audio_data, sr)
     sd.wait()
 
-    print(f"Sys: Say something... (listening up to {timeout:.0f}s + {extra:.0f}s grace)")
-
     with sd.RawInputStream(samplerate=mic_sr, blocksize=voice_cfg["blocksize"],
                            dtype='int16', channels=1) as stream:
+        # 마이크 스트림 워밍업: open 직후엔 PortAudio 초기화 지연으로 첫 ~0.x초가
+        # 불안정/clipping 된다. 이 구간을 읽어서 버리고(사용자는 아직 말 안 함),
+        # 안정된 뒤에 프롬프트 + 리드백 카운트다운을 시작한다 → 첫 단어부터 잡힘.
+        warmup_until = time.monotonic() + 0.25
+        while time.monotonic() < warmup_until:
+            stream.read(1000)
+
+        print(f"Sys: Say something... (listening up to {timeout:.0f}s + {extra:.0f}s grace)")
+
         # 초기 LCD 표시 (음성 안내 화면)
         action = scenario["lcd"]["phase2"]
         speak_sec = round(timeout)
         lcd.show(*screens.phase2(action, speak_sec, extra_remaining=0))
 
-        # 마이크를 연 시점(=TTS 종료 직후)부터 리드백 대기 한도를 잰다.
+        # 워밍업 끝난 시점(=마이크 안정 직후)부터 리드백 대기 한도를 잰다.
         start = time.monotonic()
         deadline = start + timeout
         extra_deadline = deadline + extra
