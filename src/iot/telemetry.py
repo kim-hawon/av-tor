@@ -1,4 +1,5 @@
 """TOR 시도 이벤트 텔레메트리 저장 및 조회."""
+import csv
 import os
 import json
 from datetime import datetime, timedelta
@@ -7,6 +8,10 @@ from pathlib import Path
 
 _TELEMETRY_DIR = "./data/telemetry"
 _LOG_FILE = None
+_CSV_FILE = None
+
+_CSV_HEADER = ["timestamp", "session_id", "scenario_id", "scenario_label",
+               "elapsed_sec", "result"]
 
 # 대시보드에 0건이어도 "항상" 표시할 표준 목록 (config.yaml 시나리오 / 실패 코드와 일치).
 # 시나리오를 안 돌렸거나 특정 실패가 0건이어도 4개/4종을 모두 노출한다.
@@ -21,16 +26,23 @@ ALL_FAIL_LABELS = {
 
 def init(config=None):
     """텔레메트리 디렉토리 초기화."""
-    global _LOG_FILE
+    global _LOG_FILE, _CSV_FILE
     telemetry_dir = (config or {}).get("capture", {}).get("out_dir", "./data/captures")
     telemetry_dir = os.path.join(os.path.dirname(telemetry_dir), "telemetry")
-    
+
     Path(telemetry_dir).mkdir(parents=True, exist_ok=True)
-    
+
     # 오늘 날짜로 로그 파일 생성
     today = datetime.now().strftime("%Y-%m-%d")
     _LOG_FILE = os.path.join(telemetry_dir, f"tor_{today}.jsonl")
     print(f"[TELEMETRY] Initialized: {_LOG_FILE}")
+
+    # Phase2 음성인식 타이밍 CSV (누적 파일)
+    _CSV_FILE = os.path.join(telemetry_dir, "phase2_timing.csv")
+    if not os.path.exists(_CSV_FILE):
+        with open(_CSV_FILE, "w", newline="", encoding="utf-8-sig") as f:
+            csv.writer(f).writerow(_CSV_HEADER)
+    print(f"[TELEMETRY] Phase2 CSV: {_CSV_FILE}")
 
     # 30일보다 오래된 기록은 정리(디스크 무한 증가 방지, 대시보드 최대 조회와 일치)
     _cleanup_old(telemetry_dir, keep_days=30)
@@ -80,6 +92,33 @@ def log_event(event_type: str, scenario: dict, status: str, **kwargs):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
     except Exception as e:
         print(f"[TELEMETRY] Write error: {e}")
+
+
+def log_phase2_timing(session_id: str, scenario: dict, elapsed_sec: float, result: str):
+    """Phase2 오디오 재생 완료 → 음성인식 완료까지 소요 시간을 CSV에 기록.
+
+    elapsed_sec: TTS 재생이 끝난 시점부터 인식 완료(또는 타임아웃)까지 초.
+    result: "success" | "fail"
+    """
+    global _CSV_FILE
+    if _CSV_FILE is None:
+        init()
+
+    row = [
+        datetime.now().isoformat(timespec="seconds"),
+        session_id,
+        scenario.get("id", ""),
+        scenario.get("label", ""),
+        round(elapsed_sec, 2),
+        result,
+    ]
+    try:
+        with open(_CSV_FILE, "a", newline="", encoding="utf-8-sig") as f:
+            csv.writer(f).writerow(row)
+        print(f"[TELEMETRY] Phase2 timing: {scenario.get('label')} "
+              f"{elapsed_sec:.1f}s → {result}")
+    except Exception as e:
+        print(f"[TELEMETRY] CSV write error: {e}")
 
 
 def get_events(days: int = 1) -> list:

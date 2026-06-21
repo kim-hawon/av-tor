@@ -55,10 +55,9 @@ class StateMachine:
             ok = True
             print(f"[PHASE2] [DUMMY] voice_ok=true → voice recognition success "
                   f"(expected: '{scenario['answer']}')")
+            telemetry.log_phase2_timing(context["session_id"], scenario, 0.0, "success")
         elif dummy.get("use_real_voice", False):
             from core.states.phase2 import run as phase2_run  # 지연 import
-            # PHASE1에서 남은 카운트다운 초를 이어받아(voice_listen 한도로 클램프) 계속
-            # 카운트다운하고, 그 시간이 끝나면 voice_extra(기본 3초)를 추가로 더 준다.
             listen_timeout = float(cfg.get("timing", {}).get("voice_listen", 12))
             voice_extra = float(cfg.get("timing", {}).get("voice_extra", 3))
             phase1_remaining = context.get("phase1_remaining")
@@ -72,11 +71,13 @@ class StateMachine:
                 stt_session=context.get("stt_session"),
                 timeout=listen_timeout,
                 extra=voice_extra,
+                session_id=context["session_id"],
             )
         else:
             speaker.play(scenario["audio"])
             ok = False
             print(f"[PHASE2] [DUMMY] voice_ok=false, use_real_voice=false → fail")
+            telemetry.log_phase2_timing(context["session_id"], scenario, 0.0, "fail")
 
         if ok:
             print("[PHASE2] Voice verification passed → HANDOVER_OK")

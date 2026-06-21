@@ -125,7 +125,7 @@ def _read_wav(path: str) -> tuple:
 
 
 def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
-        timeout: float = 12.0, extra: float = 3.0) -> bool:
+        timeout: float = 12.0, extra: float = 3.0, session_id: str | None = None) -> bool:
     """시나리오 TTS 재생 후 운전자 리드백을 STT 로 검증.
 
     정답을 인식하면 True. 정답 인식 없이 timeout(초)이 지나면 False 를 반환해
@@ -152,6 +152,7 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
     #  재생 동안 마이크 버퍼가 넘쳐, 정작 리드백 구간에서 인식이 안 됐다.)
     sd.play(audio_data, sr)
     sd.wait()
+    t_audio_done = time.monotonic()  # 오디오 재생 완료 시점 — 타이머 시작
 
     print(f"Sys: Say something... (listening up to {timeout:.0f}s + {extra:.0f}s grace)")
 
@@ -169,10 +170,8 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
     last_lcd_update = start
     extra_notice_sent = False
 
-    # 세션 동안 인식된 모든 최종 텍스트를 누적한다. "lane" 과 "one" 을 끊어
-    # 말해 별도 발화로 잡혀도, 누적본("lane one")에서 키워드를 찾을 수 있다.
-    # chunks: list[str] = []
     transcript = ""
+    _phase2_result: bool | None = None  # finally 블록에서 CSV 기록에 사용
 
     try:
         while True:
@@ -201,17 +200,17 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
                 if verify(scenario["answer"], transcript):
                     print(f"\nHeard: {transcript}")
                     print("Sys: TOR success")
+                    _phase2_result = True
                     return True
                 print(f"\nHeard: '{transcript}' — Sys: Voice readback timeout")
+                _phase2_result = False
                 return False
 
             data, _ = stream.read(1000)
             if rec.AcceptWaveform(bytes(data)):
-                # 한 발화 종료 → final result는 무시하고 partial 기반으로만 처리
                 text = _clean(json.loads(rec.Result())["text"])
                 if text:
                     print(f"Heard: {text}  (ignored for chunk logic)")
-                # partial-only 모드이므로 here we do not update chunks/transcript
             else:
                 # 발화 중 부분결과 — partial 텍스트만 실시간 비교
                 partial = _clean(json.loads(rec.PartialResult()).get("partial", ""))
@@ -220,7 +219,16 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
                     if verify(scenario["answer"], partial):
                         print(f"\nHeard: {partial}")
                         print("Sys: TOR success")
+                        _phase2_result = True
                         return True
     finally:
+        if _phase2_result is not None:
+            from iot import telemetry
+            telemetry.log_phase2_timing(
+                session_id or "",
+                scenario,
+                time.monotonic() - t_audio_done,
+                "success" if _phase2_result else "fail",
+            )
         if cleanup_after:
             cleanup_session(stt_session)

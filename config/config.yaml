@@ -114,8 +114,8 @@ hmi:
   vibration_active_high: true # 진동 ON = HIGH
   grip_active_high: true # 터치 감지 = HIGH (센서에 맞게 조정)
   lcd:
-    cols: 20 # 20x4 캐릭터 LCD
-    rows: 4
+    cols: 16 # 20x4 캐릭터 LCD
+    rows: 2
     i2c_address: 0x27 # PCF8574 백팩 주소 (보통 0x27 또는 0x3F)
     i2c_port: 1
 
