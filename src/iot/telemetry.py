@@ -94,6 +94,14 @@ def log_event(event_type: str, scenario: dict, status: str, **kwargs):
         print(f"[TELEMETRY] Write error: {e}")
 
 
+def gaze_log_path(session_id: str) -> str:
+    """Phase1 gaze 측정값을 저장할 CSV 경로 반환 (세션마다 개별 파일)."""
+    global _CSV_FILE
+    if _CSV_FILE is None:
+        init()
+    return os.path.join(os.path.dirname(_CSV_FILE), f"gaze_{session_id}.csv")
+
+
 def log_phase2_timing(session_id: str, scenario: dict, elapsed_sec: float, result: str):
     """Phase2 오디오 재생 완료 → 음성인식 완료까지 소요 시간을 CSV에 기록.
 

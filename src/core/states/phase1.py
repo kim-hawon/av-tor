@@ -15,6 +15,7 @@ import time
 
 from core.states import STATE_PHASE2, STATE_MRM
 from hmi import led, buzzer, vibration, lcd, screens
+from iot import telemetry
 from monitoring import grip
 
 
@@ -74,6 +75,9 @@ def run(context):
     use_real_gaze = context.get("use_real_gaze", False) and gaze_monitor is not None
     if use_real_gaze:
         gaze_monitor.reset()  # 이번 세션은 새로 1초 응시를 요구(직전 상태 무시)
+        gaze_csv = telemetry.gaze_log_path(context["session_id"])
+        gaze_monitor.start_logging(gaze_csv)
+        print(f"[PHASE1] Gaze metrics logging → {gaze_csv}")
     else:
         print(f"[PHASE1] No camera — dummy gaze active (ok after {gaze_ok_after}s)")
 
@@ -166,6 +170,8 @@ def run(context):
         return STATE_MRM
 
     finally:
+        if use_real_gaze:
+            gaze_monitor.stop_logging()
         if stt_session is not None and context.get("phase1_remaining") is None:
             from core.states.phase2 import cleanup_session as cleanup_stt_session
             cleanup_stt_session(stt_session)
