@@ -8,6 +8,7 @@ python-dotenv>=1.0   # .env 파일에서 TG_BOT_TOKEN/TG_CHAT_ID 자동 로드
 # 음성/오디오 (스피커 재생, 음성 raw 녹음, STT)
 #   없어도 SIM 모드로 동작하지만, 실제 재생/녹음하려면 필요
 sounddevice>=0.4.6
+soundfile>=0.12.1
 numpy>=1.21
 
 # 음성인식 STT (config 의 dummy.use_real_voice=true 일 때만 필요)

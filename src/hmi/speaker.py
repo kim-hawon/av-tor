@@ -13,13 +13,11 @@ import subprocess
 
 try:
     import sounddevice as sd  # type: ignore
-    import numpy as np       # type: ignore
-    import wave
+    import soundfile as sf    # type: ignore
     _HAS_SD = True
 except (ImportError, OSError):
     sd = None
-    np = None
-    wave = None
+    sf = None
     _HAS_SD = False
 
 
@@ -85,25 +83,8 @@ def play(path: str, block: bool = True) -> float:
         return 0.0
 
     if _HAS_SD:
-        with wave.open(path, "rb") as wf:
-            sr = wf.getframerate()
-            nch = wf.getnchannels()
-            sampwidth = wf.getsampwidth()
-            frames = wf.getnframes()
-            raw = wf.readframes(frames)
-        # convert raw bytes to numpy array
-        if sampwidth == 1:
-            dtype = np.uint8
-        elif sampwidth == 2:
-            dtype = np.int16
-        elif sampwidth == 4:
-            dtype = np.int32
-        else:
-            dtype = np.int16
-        data = np.frombuffer(raw, dtype=dtype)
-        if nch > 1:
-            data = data.reshape(-1, nch)
-        duration = frames / float(sr)
+        data, sr = sf.read(path)
+        duration = len(data) / float(sr)
         print(f"[SPK] ▶ Playing: {name} ({duration:.1f}s)")
         sd.play(data, sr)
         if block:
@@ -123,11 +104,8 @@ def play(path: str, block: bool = True) -> float:
 def duration(path: str) -> float:
     """wav 길이(초). 알 수 없으면 0."""
     if _HAS_SD and os.path.exists(path):
-        try:
-            with wave.open(path, "rb") as wf:
-                return wf.getnframes() / float(wf.getframerate())
-        except Exception:
-            return 0.0
+        info = sf.info(path)
+        return info.frames / float(info.samplerate)
     return 0.0
 
 
