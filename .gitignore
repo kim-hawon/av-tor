@@ -68,7 +68,8 @@ env/
 
 # ===== 환경 / 설정 비밀값 =====
 .env
-config/secrets.yaml          # MQTT/클라우드 인증정보는 커밋 금지
+# MQTT/클라우드 인증정보는 커밋 금지
+config/secrets.yaml
 *.pem
 *.key
 
@@ -83,9 +84,12 @@ models/gaze/
 # ===== 런타임 산출물 / 로그 =====
 logs/
 *.log
-data/recordings/             # 마이크 녹음, 디버그 캡처
-data/captures/               # 카메라 프레임 캡처
-data/telemetry/              # 로컬에 쌓인 이벤트 텔레메트리
+# 마이크 녹음, 디버그 캡처
+data/recordings/
+# 카메라 프레임 캡처
+data/captures/
+# 로컬에 쌓인 이벤트 텔레메트리
+data/telemetry/
 
 # ===== 라즈베리파이 / 하드웨어 =====
 *.swp
