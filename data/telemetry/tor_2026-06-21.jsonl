@@ -18,3 +18,5 @@
 {"timestamp": "2026-06-21T15:34:01.821384", "event": "tor_start", "scenario_id": 2, "scenario_label": "Rain", "status": "started", "session_id": "781fb48b", "param": 20}
 {"timestamp": "2026-06-21T15:34:18.179878", "event": "tor_end", "scenario_id": 2, "scenario_label": "Rain", "status": "success", "session_id": "781fb48b", "fail_code": null, "fail_reason": null}
 {"timestamp": "2026-06-21T16:20:39.907855", "event": "tor_start", "scenario_id": 1, "scenario_label": "Construction Zone", "status": "started", "session_id": "0cc47513", "param": 400}
+{"timestamp": "2026-06-21T17:19:07.668678", "event": "tor_start", "scenario_id": 1, "scenario_label": "Construction Zone", "status": "started", "session_id": "7ee34bf5", "param": 400}
+{"timestamp": "2026-06-21T17:19:22.570182", "event": "tor_end", "scenario_id": 1, "scenario_label": "Construction Zone", "status": "success", "session_id": "7ee34bf5", "fail_code": null, "fail_reason": null}
