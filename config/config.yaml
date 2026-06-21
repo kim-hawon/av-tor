@@ -44,7 +44,7 @@ scenarios:
     param: { default: 20, unit: mmh }
     lcd:
       phase1: "RAIN {v}mmh"
-      phase2: "Slow 64kmh"
+      phase2: "Slow 60kmh"
   - id: 3
     key: fog
     label: "Fog"
