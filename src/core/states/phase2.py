@@ -28,9 +28,10 @@
 #     pass
 
 import time
+import wave
+import numpy as np
 from vosk import Model, KaldiRecognizer
 import sounddevice as sd
-import soundfile as sf
 import json
 from core.readback import verify
 from hmi import lcd, screens
@@ -109,6 +110,20 @@ def cleanup_session(session: STTSession | None):
     session.close()
 
 
+def _read_wav(path: str) -> tuple:
+    """wave 모듈로 wav 파일을 읽고 (audio_data, samplerate)를 반환."""
+    with wave.open(path, 'rb') as wf:
+        n_frames = wf.getnframes()
+        n_channels = wf.getnchannels()
+        sample_width = wf.getsampwidth()
+        framerate = wf.getframerate()
+        audio_bytes = wf.readframes(n_frames)
+        audio_data = np.frombuffer(audio_bytes, dtype=np.int16)
+        if n_channels > 1:
+            audio_data = audio_data.reshape(-1, n_channels)
+        return audio_data, framerate
+
+
 def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
         timeout: float = 12.0, extra: float = 3.0) -> bool:
     """시나리오 TTS 재생 후 운전자 리드백을 STT 로 검증.
@@ -119,7 +134,7 @@ def run(scenario: dict, voice_cfg: dict, stt_session: STTSession | None = None,
     timeout 종료 후 extra 초 만큼 추가 기회를 준다.
     실행 중 LCD에 남은 시간을 실시간으로 표시한다.
     """
-    audio_data, sr = sf.read(scenario["audio"])
+    audio_data, sr = _read_wav(scenario["audio"])
 
     if stt_session is None:
         stt_session = prepare(voice_cfg)

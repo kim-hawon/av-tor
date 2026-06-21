@@ -10,3 +10,10 @@
 {"timestamp": "2026-06-21T02:03:02.444186", "event": "tor_end", "scenario_id": 1, "scenario_label": "Construction Zone", "status": "success", "session_id": "bbb9b24a", "fail_code": null, "fail_reason": null}
 {"timestamp": "2026-06-21T02:04:09.223486", "event": "tor_start", "scenario_id": 2, "scenario_label": "Rain", "status": "started", "session_id": "815b8e9d", "param": 20}
 {"timestamp": "2026-06-21T02:04:24.838234", "event": "tor_end", "scenario_id": 2, "scenario_label": "Rain", "status": "success", "session_id": "815b8e9d", "fail_code": null, "fail_reason": null}
+{"timestamp": "2026-06-21T15:31:17.075321", "event": "tor_start", "scenario_id": 1, "scenario_label": "Construction Zone", "status": "started", "session_id": "214222c0", "param": 400}
+{"timestamp": "2026-06-21T15:31:32.496495", "event": "tor_end", "scenario_id": 1, "scenario_label": "Construction Zone", "status": "success", "session_id": "214222c0", "fail_code": null, "fail_reason": null}
+{"timestamp": "2026-06-21T15:31:37.614461", "event": "tor_start", "scenario_id": 2, "scenario_label": "Rain", "status": "started", "session_id": "60a6c32f", "param": 20}
+{"timestamp": "2026-06-21T15:31:52.997563", "event": "tor_end", "scenario_id": 2, "scenario_label": "Rain", "status": "success", "session_id": "60a6c32f", "fail_code": null, "fail_reason": null}
+{"timestamp": "2026-06-21T15:32:40.817576", "event": "tor_start", "scenario_id": 2, "scenario_label": "Rain", "status": "started", "session_id": "4f81d2e3", "param": 20}
+{"timestamp": "2026-06-21T15:34:01.821384", "event": "tor_start", "scenario_id": 2, "scenario_label": "Rain", "status": "started", "session_id": "781fb48b", "param": 20}
+{"timestamp": "2026-06-21T15:34:18.179878", "event": "tor_end", "scenario_id": 2, "scenario_label": "Rain", "status": "success", "session_id": "781fb48b", "fail_code": null, "fail_reason": null}
