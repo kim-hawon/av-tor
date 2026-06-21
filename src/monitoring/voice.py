@@ -9,13 +9,13 @@
 import os
 import time
 
+import wave
+
 try:
     import sounddevice as sd  # type: ignore
-    import soundfile as sf    # type: ignore
     _HAS_SD = True
 except (ImportError, OSError):
     sd = None
-    sf = None
     _HAS_SD = False
 
 
@@ -33,7 +33,11 @@ def record(out_path: str, seconds: float = 4.0, samplerate: int = 16000) -> str:
     frames = int(seconds * samplerate)
     audio = sd.rec(frames, samplerate=samplerate, channels=1, dtype="int16")
     sd.wait()
-    sf.write(out_path, audio, samplerate)
+    with wave.open(out_path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # int16 = 2 bytes
+        wf.setframerate(samplerate)
+        wf.writeframes(audio.tobytes())
     print(f"[VOICE] Saved: {out_path}")
     return out_path
 

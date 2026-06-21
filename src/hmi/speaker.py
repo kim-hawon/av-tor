@@ -10,14 +10,15 @@ sounddevice + soundfile 를 쓰되, 둘 다 없으면 시스템 aplay 로,
 import os
 import shutil
 import subprocess
+import wave
+
+import numpy as np  # type: ignore
 
 try:
     import sounddevice as sd  # type: ignore
-    import soundfile as sf    # type: ignore
     _HAS_SD = True
 except (ImportError, OSError):
     sd = None
-    sf = None
     _HAS_SD = False
 
 
@@ -83,7 +84,15 @@ def play(path: str, block: bool = True) -> float:
         return 0.0
 
     if _HAS_SD:
-        data, sr = sf.read(path)
+        with wave.open(path, "rb") as wf:
+            sr = wf.getframerate()
+            n_channels = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            raw = wf.readframes(wf.getnframes())
+        dtype = np.int16 if sampwidth == 2 else np.uint8
+        data = np.frombuffer(raw, dtype=dtype)
+        if n_channels > 1:
+            data = data.reshape(-1, n_channels)
         duration = len(data) / float(sr)
         print(f"[SPK] ▶ Playing: {name} ({duration:.1f}s)")
         sd.play(data, sr)
@@ -103,9 +112,9 @@ def play(path: str, block: bool = True) -> float:
 
 def duration(path: str) -> float:
     """wav 길이(초). 알 수 없으면 0."""
-    if _HAS_SD and os.path.exists(path):
-        info = sf.info(path)
-        return info.frames / float(info.samplerate)
+    if os.path.exists(path):
+        with wave.open(path, "rb") as wf:
+            return wf.getnframes() / float(wf.getframerate())
     return 0.0
 
 
