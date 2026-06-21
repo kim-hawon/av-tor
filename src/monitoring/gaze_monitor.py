@@ -79,6 +79,10 @@ class GazeMonitor:
         self._cap = None             # start()에서 연 카메라 핸들 — 스레드가 그대로 재사용
         self._preview_frame = None   # latest annotated frame; displayed by main thread
         self._frame_lock = threading.Lock()
+        # Logging
+        self._log_path = None
+        self._log_fh = None
+        self._log_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -163,6 +167,30 @@ class GazeMonitor:
         """Return the latest annotated frame for display in the main thread."""
         with self._frame_lock:
             return self._preview_frame
+
+    def start_logging(self, path: str):
+        """Start appending per-frame metrics to CSV `path`.
+
+        CSV columns: epoch_ts, monotonic_ts, frame_index, face, ear, nose_ratio, gaze_ok
+        """
+        with self._log_lock:
+            # open in append mode; write header if new
+            new_file = not os.path.exists(path)
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            self._log_fh = open(path, "a", buffering=1)
+            if new_file:
+                self._log_fh.write("epoch_ts,monotonic_ts,frame_index,face,ear,nose_ratio,gaze_ok\n")
+            self._log_path = path
+
+    def stop_logging(self):
+        with self._log_lock:
+            if self._log_fh:
+                try:
+                    self._log_fh.close()
+                except Exception:
+                    pass
+            self._log_fh = None
+            self._log_path = None
 
     def is_gaze_ok(self, required_duration: float = 1.0) -> bool:
         """True if detection box has been green for >= required_duration seconds."""
@@ -276,5 +304,26 @@ class GazeMonitor:
                         self._green_since = time.monotonic()
                 else:
                     self._green_since = None
+
+            # Per-frame logging if enabled
+            if self._log_fh is not None:
+                try:
+                    epoch_ts = time.time()
+                    mono_ts = time.monotonic()
+                    face = 1 if last_lm is not None else 0
+                    if last_lm is not None:
+                        ear = (_ear(last_lm[36:42]) + _ear(last_lm[42:48])) / 2.0
+                        ratio = _nose_ratio(last_lm)
+                        gaze_ok = 1 if (_ear(last_lm[36:42]) + _ear(last_lm[42:48])) / 2.0 > EAR_THRESHOLD and NOSE_RATIO_MIN <= ratio <= NOSE_RATIO_MAX else 0
+                    else:
+                        ear = 0.0
+                        ratio = 0.0
+                        gaze_ok = 0
+                    with self._log_lock:
+                        if self._log_fh:
+                            self._log_fh.write(f"{epoch_ts:.3f},{mono_ts:.3f},{frame_count},{face},{ear:.3f},{ratio:.3f},{gaze_ok}\n")
+                except Exception:
+                    # don't let logging errors stop the monitor
+                    pass
 
         cap.release()
