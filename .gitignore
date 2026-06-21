@@ -85,7 +85,7 @@ logs/
 *.log
 data/recordings/             # 마이크 녹음, 디버그 캡처
 data/captures/               # 카메라 프레임 캡처
-telemetry/*.jsonl            # 로컬에 쌓인 이벤트 텔레메트리
+data/telemetry/              # 로컬에 쌓인 이벤트 텔레메트리
 
 # ===== 라즈베리파이 / 하드웨어 =====
 *.swp
